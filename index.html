@@ -7,7 +7,33 @@
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-    <div id="app">
+    <!-- File Upload Dropzone -->
+    <div id="upload-screen">
+        <div id="dropzone">
+            <div class="dropzone-icon">📁</div>
+            <h2>Drop Files Here</h2>
+            <p class="dropzone-subtitle">or click to select files</p>
+            <input type="file" id="file-input" multiple accept=".json,.txt" />
+            <div class="required-files">
+                <p>Required files:</p>
+                <div class="file-status" id="status-activation">
+                    <span class="status-icon">○</span>
+                    <span class="file-name">activation_indices.json</span>
+                </div>
+                <div class="file-status" id="status-seq">
+                    <span class="status-icon">○</span>
+                    <span class="file-name">seq.txt</span>
+                </div>
+                <div class="file-status" id="status-top">
+                    <span class="status-icon">○</span>
+                    <span class="file-name">top_activations.json</span>
+                </div>
+            </div>
+            <button id="btn-load" disabled>Load Data</button>
+        </div>
+    </div>
+
+    <div id="app" class="hidden">
         <!-- Activation Detail Panel (hidden by default) -->
         <div id="activation-panel" class="hidden">
             <div id="activation-panel-header">

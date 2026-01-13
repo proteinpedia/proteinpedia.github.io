@@ -10,6 +10,116 @@ let nodeIdCounter = 0;
 let edgeIdCounter = 0;
 let dragState = null;
 
+// File upload state
+let uploadedFiles = {
+    activationIndices: null,
+    seq: null,
+    topActivations: null
+};
+
+// Upload screen elements
+const uploadScreen = document.getElementById('upload-screen');
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+const btnLoad = document.getElementById('btn-load');
+const statusActivation = document.getElementById('status-activation');
+const statusSeq = document.getElementById('status-seq');
+const statusTop = document.getElementById('status-top');
+const appContainer = document.getElementById('app');
+
+// File upload handlers
+dropzone.addEventListener('click', () => fileInput.click());
+
+dropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzone.classList.add('drag-over');
+});
+
+dropzone.addEventListener('dragleave', () => {
+    dropzone.classList.remove('drag-over');
+});
+
+dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('drag-over');
+    handleFiles(e.dataTransfer.files);
+});
+
+fileInput.addEventListener('change', (e) => {
+    handleFiles(e.target.files);
+});
+
+function handleFiles(files) {
+    for (const file of files) {
+        const name = file.name.toLowerCase();
+
+        if (name === 'activation_indices.json' || name.includes('activation_indices')) {
+            uploadedFiles.activationIndices = file;
+            statusActivation.classList.add('loaded');
+            statusActivation.querySelector('.status-icon').textContent = '●';
+        } else if (name === 'seq.txt' || name.includes('seq')) {
+            uploadedFiles.seq = file;
+            statusSeq.classList.add('loaded');
+            statusSeq.querySelector('.status-icon').textContent = '●';
+        } else if (name === 'top_activations.json' || name.includes('top_activations')) {
+            uploadedFiles.topActivations = file;
+            statusTop.classList.add('loaded');
+            statusTop.querySelector('.status-icon').textContent = '●';
+        }
+    }
+
+    updateLoadButton();
+}
+
+function updateLoadButton() {
+    const allLoaded = uploadedFiles.activationIndices &&
+                      uploadedFiles.seq &&
+                      uploadedFiles.topActivations;
+    btnLoad.disabled = !allLoaded;
+}
+
+btnLoad.addEventListener('click', async () => {
+    if (btnLoad.disabled) return;
+
+    try {
+        btnLoad.textContent = 'Loading...';
+        btnLoad.disabled = true;
+
+        // Read all files
+        const [activationsText, seqText, topActivationsText] = await Promise.all([
+            uploadedFiles.activationIndices.text(),
+            uploadedFiles.seq.text(),
+            uploadedFiles.topActivations.text()
+        ]);
+
+        const activations = JSON.parse(activationsText);
+        sequence = seqText.trim();
+        topActivationsData = JSON.parse(topActivationsText);
+
+        // Index by layer and position
+        for (const [layer, pos, value, latentIdx] of activations) {
+            if (!activationData[layer]) activationData[layer] = {};
+            if (!activationData[layer][pos]) activationData[layer][pos] = [];
+            activationData[layer][pos].push({ value, latentIdx });
+        }
+
+        // Hide upload screen, show app
+        uploadScreen.classList.add('hidden');
+        appContainer.classList.remove('hidden');
+
+        // Render the visualization
+        renderGrid();
+        renderSequence();
+        updateLegend();
+
+    } catch (err) {
+        console.error('Error loading files:', err);
+        alert('Error loading files. Please make sure all files are valid.');
+        btnLoad.textContent = 'Load Data';
+        updateLoadButton();
+    }
+});
+
 // DOM Elements
 const gridBody = document.getElementById('grid-body');
 const sequenceBar = document.getElementById('sequence-bar');
@@ -73,34 +183,6 @@ function getActivationColor(value, minVal, maxVal) {
     return `rgb(${r}, ${g}, ${b})`;
 }
 
-// Load data
-async function loadData() {
-    try {
-        const [activationsRes, seqRes, topActivationsRes] = await Promise.all([
-            fetch('activation_indices.json'),
-            fetch('seq.txt'),
-            fetch('top_activations.json')
-        ]);
-
-        const activations = await activationsRes.json();
-        sequence = (await seqRes.text()).trim();
-        topActivationsData = await topActivationsRes.json();
-
-        // Index by layer and position
-        for (const [layer, pos, value, latentIdx] of activations) {
-            if (!activationData[layer]) activationData[layer] = {};
-            if (!activationData[layer][pos]) activationData[layer][pos] = [];
-            activationData[layer][pos].push({ value, latentIdx });
-        }
-
-        renderGrid();
-        renderSequence();
-        updateLegend();
-    } catch (err) {
-        console.error('Error loading data:', err);
-        gridBody.innerHTML = '<div style="padding: 20px; color: red;">Error loading data. Make sure activation_indices.json and seq.txt exist.</div>';
-    }
-}
 
 // Find min/max activation values for color scaling
 function getValueRange() {
@@ -266,13 +348,33 @@ function renderWildTypeCard(layer, latentIdx, clickedPos, clickedValue) {
     `;
 }
 
+// Current panel state for tab switching
+let currentPanelState = null;
+
 // Show the activation panel with wild type and top sequences for a latent
 function showActivationPanel(layer, latentIdx, clickedPos, clickedValue) {
+    // Store state for tab switching
+    currentPanelState = { layer, latentIdx, clickedPos, clickedValue };
+
     // Update panel title
     panelTitle.textContent = `Layer ${layer} - Latent ${latentIdx}`;
 
+    // Render tabs and sequences view by default
+    renderSequencesTab();
+
+    // Show panel
+    activationPanel.classList.remove('hidden');
+}
+
+// Render the Sequences tab content
+function renderSequencesTab() {
+    const { layer, latentIdx, clickedPos, clickedValue } = currentPanelState;
+
+    // Add tabs
+    let html = renderTabs('sequences');
+
     // Start with wild type card
-    let html = renderWildTypeCard(layer, latentIdx, clickedPos, clickedValue);
+    html += renderWildTypeCard(layer, latentIdx, clickedPos, clickedValue);
 
     // Add separator
     html += '<div class="panel-section-title">Top Activating Sequences</div>';
@@ -297,9 +399,252 @@ function showActivationPanel(layer, latentIdx, clickedPos, clickedValue) {
     }
 
     panelContent.innerHTML = html;
+    attachTabListeners();
+}
 
-    // Show panel
-    activationPanel.classList.remove('hidden');
+// Render tab controls
+function renderTabs(activeTab) {
+    return `
+        <div class="panel-tabs">
+            <button class="panel-tab ${activeTab === 'sequences' ? 'active' : ''}" data-tab="sequences">Sequences</button>
+            <button class="panel-tab ${activeTab === 'alignment' ? 'active' : ''}" data-tab="alignment">Alignment</button>
+        </div>
+    `;
+}
+
+// Attach tab click listeners
+function attachTabListeners() {
+    panelContent.querySelectorAll('.panel-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.dataset.tab;
+            if (tabName === 'sequences') {
+                renderSequencesTab();
+            } else if (tabName === 'alignment') {
+                renderAlignmentTab();
+            }
+        });
+    });
+}
+
+// Render the Alignment tab content
+function renderAlignmentTab() {
+    const { layer, latentIdx, clickedPos, clickedValue } = currentPanelState;
+
+    // Add tabs
+    let html = renderTabs('alignment');
+
+    // Get all sequences to align
+    const sequencesToAlign = [];
+
+    // Add wild type sequence
+    const wildTypeActivations = getWildTypeActivations(layer, latentIdx);
+    const wildTypeMaxIdx = findMaxActivationIndex(wildTypeActivations);
+    sequencesToAlign.push({
+        name: 'Wild Type',
+        entry: '',
+        proteinName: 'Current Sequence',
+        sequence: sequence,
+        activations: wildTypeActivations,
+        maxIdx: wildTypeMaxIdx,
+        isWildType: true
+    });
+
+    // Add top activating sequences
+    if (topActivationsData && topActivationsData.layers) {
+        const layerData = topActivationsData.layers[layer.toString()];
+        if (layerData) {
+            const latentData = layerData[latentIdx.toString()];
+            if (latentData && latentData.length > 0) {
+                latentData.forEach((item, idx) => {
+                    const maxIdx = findMaxActivationIndex(item.Activations);
+                    sequencesToAlign.push({
+                        name: item['Entry Name'] || 'Unknown',
+                        entry: item.Entry || 'N/A',
+                        proteinName: item['Protein names'] || 'Unknown protein',
+                        sequence: item.Sequence,
+                        activations: item.Activations,
+                        maxIdx: maxIdx,
+                        isWildType: false,
+                        rank: idx + 1
+                    });
+                });
+            }
+        }
+    }
+
+    // Compute alignment
+    const aligned = computeMaxAlignment(sequencesToAlign);
+
+    // Add toolbar with Go to Center button
+    html += '<div class="alignment-toolbar">';
+    html += `<button class="btn-go-to-center" data-center="${aligned.alignmentPosition}">Go to Center</button>`;
+    html += `<span class="alignment-info">Aligned at position ${aligned.alignmentPosition}</span>`;
+    html += '</div>';
+
+    // Render alignment view
+    html += '<div class="alignment-container">';
+    html += `<div class="alignment-scroll" id="alignment-scroll">`;
+
+    // Render position ruler with center marker
+    html += renderPositionRuler(aligned.totalLength, aligned.alignmentPosition);
+
+    // Render each aligned sequence with center line
+    aligned.sequences.forEach(seq => {
+        html += renderAlignedSequence(seq, aligned.alignmentPosition);
+    });
+
+    html += '</div></div>';
+
+    panelContent.innerHTML = html;
+    attachTabListeners();
+    attachAlignmentListeners();
+}
+
+// Attach alignment-specific listeners
+function attachAlignmentListeners() {
+    const goToCenterBtn = panelContent.querySelector('.btn-go-to-center');
+    if (goToCenterBtn) {
+        goToCenterBtn.addEventListener('click', () => {
+            scrollToAlignmentCenter();
+        });
+    }
+}
+
+// Scroll to the alignment center
+function scrollToAlignmentCenter() {
+    const scrollContainer = document.getElementById('alignment-scroll');
+    const centerMarker = scrollContainer?.querySelector('.center-line');
+    if (scrollContainer && centerMarker) {
+        const containerWidth = scrollContainer.clientWidth;
+        const markerOffset = centerMarker.offsetLeft;
+        // Scroll so the center line is in the middle of the view
+        scrollContainer.scrollLeft = markerOffset - (containerWidth / 2) + 10;
+    }
+}
+
+// Find the index of max activation in an array
+function findMaxActivationIndex(activations) {
+    let maxVal = -Infinity;
+    let maxIdx = 0;
+    for (let i = 0; i < activations.length; i++) {
+        if (activations[i] > maxVal) {
+            maxVal = activations[i];
+            maxIdx = i;
+        }
+    }
+    return maxIdx;
+}
+
+// Compute max activation alignment
+function computeMaxAlignment(sequences) {
+    // Find the maximum offset needed (the largest maxIdx)
+    const maxOffset = Math.max(...sequences.map(s => s.maxIdx));
+
+    // Calculate aligned sequences
+    const alignedSequences = sequences.map(seq => {
+        const leftPadding = maxOffset - seq.maxIdx;
+        const alignedLength = leftPadding + seq.sequence.length;
+
+        return {
+            ...seq,
+            leftPadding,
+            alignedLength
+        };
+    });
+
+    // Find total length (max of all aligned lengths)
+    const totalLength = Math.max(...alignedSequences.map(s => s.alignedLength));
+
+    // Add right padding info
+    alignedSequences.forEach(seq => {
+        seq.rightPadding = totalLength - seq.alignedLength;
+    });
+
+    return {
+        sequences: alignedSequences,
+        totalLength,
+        alignmentPosition: maxOffset
+    };
+}
+
+// Render position ruler for alignment
+function renderPositionRuler(totalLength, centerPosition) {
+    let html = '<div class="alignment-row ruler-row"><div class="alignment-label"></div><div class="alignment-sequence">';
+
+    for (let i = 0; i < totalLength; i++) {
+        const isCenter = i === centerPosition;
+        const centerClass = isCenter ? ' center-line' : '';
+
+        if (i % 10 === 0) {
+            html += `<span class="ruler-mark${centerClass}">${i}</span>`;
+        } else if (i % 5 === 0) {
+            html += `<span class="ruler-tick${centerClass}">|</span>`;
+        } else {
+            html += `<span class="ruler-dot${centerClass}">·</span>`;
+        }
+    }
+
+    html += '</div></div>';
+    return html;
+}
+
+// Render a single aligned sequence
+function renderAlignedSequence(seq, centerPosition) {
+    const maxActivation = Math.max(...seq.activations.filter(a => a > 0));
+
+    let html = `<div class="alignment-row ${seq.isWildType ? 'wild-type-row' : ''}">`;
+
+    // Label
+    html += '<div class="alignment-label">';
+    if (seq.isWildType) {
+        html += '<span class="wild-type-badge">WT</span>';
+    } else {
+        html += `<span class="rank-badge">#${seq.rank}</span>`;
+    }
+    html += `<span class="alignment-entry">${seq.entry}${seq.entry ? ' ' : ''}(${seq.name})</span>`;
+    html += '</div>';
+
+    // Sequence with padding
+    html += '<div class="alignment-sequence">';
+
+    // Track aligned position (for center line)
+    let alignedPos = 0;
+
+    // Left padding
+    for (let i = 0; i < seq.leftPadding; i++) {
+        const isCenter = alignedPos === centerPosition;
+        html += `<span class="aa-char gap${isCenter ? ' center-line' : ''}">-</span>`;
+        alignedPos++;
+    }
+
+    // Actual sequence
+    for (let i = 0; i < seq.sequence.length; i++) {
+        const aa = seq.sequence[i];
+        const activation = seq.activations[i] || 0;
+        const isMax = i === seq.maxIdx;
+        const isCenter = alignedPos === centerPosition;
+        const centerClass = isCenter ? ' center-line' : '';
+
+        if (activation === 0) {
+            html += `<span class="aa-char zero ${isMax ? 'max-pos' : ''}${centerClass}" data-pos="${i}" data-aa="${aa}" data-activation="0.00">${aa}</span>`;
+        } else {
+            const color = getActivationColorForPanel(activation, 0, maxActivation);
+            const textColor = activation > maxActivation * 0.5 ? '#000' : '#fff';
+            html += `<span class="aa-char ${isMax ? 'max-pos' : ''}${centerClass}" data-pos="${i}" data-aa="${aa}" data-activation="${activation.toFixed(2)}" style="background: ${color}; color: ${textColor}">${aa}</span>`;
+        }
+        alignedPos++;
+    }
+
+    // Right padding
+    for (let i = 0; i < seq.rightPadding; i++) {
+        const isCenter = alignedPos === centerPosition;
+        html += `<span class="aa-char gap${isCenter ? ' center-line' : ''}">-</span>`;
+        alignedPos++;
+    }
+
+    html += '</div></div>';
+
+    return html;
 }
 
 // Render a single sequence card
@@ -328,13 +673,12 @@ function renderSequenceCard(item, rank) {
         <div class="seq-card">
             <div class="seq-card-header">
                 <div class="seq-card-title">
-                    <h3><span class="rank-badge">#${rank}</span>${entryName || 'Unknown'}</h3>
+                    <h3><span class="rank-badge">#${rank}</span>${Entry || 'N/A'} (${entryName || 'Unknown'})</h3>
                     <p class="protein-name">${proteinNames || 'Unknown protein'}</p>
                 </div>
                 <div class="seq-card-score">Score: ${Score.toFixed(2)}</div>
             </div>
             <div class="seq-card-meta">
-                <span>Entry: ${Entry || 'N/A'}</span>
                 <span>Length: ${seq_len || Sequence.length} aa</span>
             </div>
             <div class="seq-visualization">
@@ -746,6 +1090,3 @@ document.addEventListener('keydown', (e) => {
         }
     }
 });
-
-// Initialize
-loadData();
