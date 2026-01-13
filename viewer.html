@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Activation Viewer</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Activation Detail Panel (hidden by default) -->
+        <div id="activation-panel" class="hidden">
+            <div id="activation-panel-header">
+                <h2 id="panel-title">Latent Activations</h2>
+                <button id="panel-close">&times;</button>
+            </div>
+            <div id="activation-panel-content"></div>
+        </div>
+
+        <!-- Color Legend -->
+        <div id="color-legend">
+            <span class="legend-label">Activation:</span>
+            <div class="legend-gradient"></div>
+            <span class="legend-min">Low</span>
+            <span class="legend-max">High</span>
+        </div>
+
+        <!-- Grid Section -->
+        <div id="grid-container">
+            <div id="layer-labels">
+                <div class="layer-label">Layer 5</div>
+                <div class="layer-label">Layer 4</div>
+                <div class="layer-label">Layer 3</div>
+                <div class="layer-label">Layer 2</div>
+                <div class="layer-label">Layer 1</div>
+                <div class="layer-label">Layer 0</div>
+            </div>
+            <div id="grid-body"></div>
+        </div>
+
+        <!-- Sequence Bar -->
+        <div id="sequence-bar">
+            <div id="sequence-content"></div>
+        </div>
+
+        <!-- Canvas Section -->
+        <div id="canvas-section" style="display: none;">
+            <div id="canvas-toolbar">
+                <button id="btn-connect">Connect</button>
+                <button id="btn-combine">Combine</button>
+                <button id="btn-delete">Delete</button>
+                <button id="btn-fullscreen">Fullscreen</button>
+            </div>
+            <div id="canvas-container">
+                <svg id="edges-svg"></svg>
+                <div id="nodes-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
