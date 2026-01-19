@@ -1,6 +1,7 @@
 // State
 let activationData = {};  // [layer][position] -> array of {value, latentIdx}
 let topActivationsData = null;  // Top activations per layer/latent from JSON
+let virtualWeightsData = null;  // Virtual weights edges from JSON
 let sequence = '';
 let canvasNodes = [];      // {id, x, y, latentIdx, layer, pos, aa, isSuper, children}
 let edges = [];            // {id, from, to}
@@ -9,12 +10,15 @@ let selectedEdges = new Set();
 let nodeIdCounter = 0;
 let edgeIdCounter = 0;
 let dragState = null;
+let virtualWeightsVisible = false;  // Toggle state for virtual weights
+let virtualWeightsEdges = [];       // Edges created from virtual weights
 
 // File upload state
 let uploadedFiles = {
     activationIndices: null,
     seq: null,
-    topActivations: null
+    topActivations: null,
+    virtualWeights: null  // Optional
 };
 
 // Upload screen elements
@@ -25,6 +29,7 @@ const btnLoad = document.getElementById('btn-load');
 const statusActivation = document.getElementById('status-activation');
 const statusSeq = document.getElementById('status-seq');
 const statusTop = document.getElementById('status-top');
+const statusVirtual = document.getElementById('status-virtual');
 const appContainer = document.getElementById('app');
 
 // File upload handlers
@@ -65,6 +70,10 @@ function handleFiles(files) {
             uploadedFiles.topActivations = file;
             statusTop.classList.add('loaded');
             statusTop.querySelector('.status-icon').textContent = '●';
+        } else if (name === 'virtual_weights.json' || name.includes('virtual_weights')) {
+            uploadedFiles.virtualWeights = file;
+            statusVirtual.classList.add('loaded');
+            statusVirtual.querySelector('.status-icon').textContent = '●';
         }
     }
 
@@ -85,16 +94,34 @@ btnLoad.addEventListener('click', async () => {
         btnLoad.textContent = 'Loading...';
         btnLoad.disabled = true;
 
-        // Read all files
-        const [activationsText, seqText, topActivationsText] = await Promise.all([
+        // Read all required files
+        const filePromises = [
             uploadedFiles.activationIndices.text(),
             uploadedFiles.seq.text(),
             uploadedFiles.topActivations.text()
-        ]);
+        ];
+
+        // Add optional virtual weights file if present
+        if (uploadedFiles.virtualWeights) {
+            filePromises.push(uploadedFiles.virtualWeights.text());
+        }
+
+        const results = await Promise.all(filePromises);
+        const [activationsText, seqText, topActivationsText] = results;
 
         const activations = JSON.parse(activationsText);
         sequence = seqText.trim();
         topActivationsData = JSON.parse(topActivationsText);
+
+        // Parse virtual weights if present
+        if (results[3]) {
+            virtualWeightsData = JSON.parse(results[3]);
+            // Enable the virtual weights toggle button
+            const btnVirtualWeights = document.getElementById('btn-virtual-weights');
+            if (btnVirtualWeights) {
+                btnVirtualWeights.disabled = false;
+            }
+        }
 
         // Index by layer and position
         for (const [layer, pos, value, latentIdx] of activations) {
@@ -757,6 +784,25 @@ panelContent.addEventListener('mousemove', moveAATooltip);
 
 // Add node to canvas
 function addNodeToCanvas(latentIdx, layer, pos, aa, value, isSuper = false, children = []) {
+    // Prevent duplicate nodes (same layer/pos/latentIdx)
+    if (!isSuper) {
+        const existingNode = canvasNodes.find(n =>
+            !n.isSuper &&
+            n.layer === layer &&
+            n.pos === pos &&
+            n.latentIdx === latentIdx
+        );
+        if (existingNode) {
+            // Highlight existing node briefly
+            const existingEl = nodesContainer.querySelector(`[data-id="${existingNode.id}"]`);
+            if (existingEl) {
+                existingEl.classList.add('highlight-pulse');
+                setTimeout(() => existingEl.classList.remove('highlight-pulse'), 500);
+            }
+            return existingNode;
+        }
+    }
+
     const id = nodeIdCounter++;
     const containerRect = nodesContainer.getBoundingClientRect();
 
@@ -781,7 +827,65 @@ function addNodeToCanvas(latentIdx, layer, pos, aa, value, isSuper = false, chil
 
     canvasNodes.push(node);
     renderNode(node);
+
+    // Auto-connect based on virtual weights
+    if (!isSuper) {
+        checkAndCreateVirtualEdges(node);
+    }
+
     return node;
+}
+
+// Find a canvas node by pos, layer, and latentIdx (feature)
+function findCanvasNode(pos, layer, latentIdx) {
+    return canvasNodes.find(n =>
+        !n.isSuper &&
+        n.pos === pos &&
+        n.layer === layer &&
+        n.latentIdx === latentIdx
+    );
+}
+
+// Check virtualWeightsData and create edges for connected nodes
+function checkAndCreateVirtualEdges(newNode) {
+    if (!virtualWeightsData) return;
+
+    for (const [srcPos, srcLayer, srcFeature, tgtPos, tgtLayer, tgtFeature, weight] of virtualWeightsData) {
+        // Check if newNode is source and target exists in canvas
+        if (newNode.pos === srcPos && newNode.layer === srcLayer && newNode.latentIdx === srcFeature) {
+            const targetNode = findCanvasNode(tgtPos, tgtLayer, tgtFeature);
+            if (targetNode) {
+                createVirtualEdge(newNode, targetNode, weight);
+            }
+        }
+        // Check if newNode is target and source exists in canvas
+        if (newNode.pos === tgtPos && newNode.layer === tgtLayer && newNode.latentIdx === tgtFeature) {
+            const sourceNode = findCanvasNode(srcPos, srcLayer, srcFeature);
+            if (sourceNode) {
+                createVirtualEdge(sourceNode, newNode, weight);
+            }
+        }
+    }
+}
+
+// Create a virtual edge between two nodes with weight
+function createVirtualEdge(fromNode, toNode, weight) {
+    // Check if edge already exists
+    const exists = edges.some(e =>
+        (e.from === fromNode.id && e.to === toNode.id) ||
+        (e.from === toNode.id && e.to === fromNode.id)
+    );
+    if (exists) return;
+
+    const edge = {
+        id: edgeIdCounter++,
+        from: fromNode.id,
+        to: toNode.id,
+        weight: weight,
+        isVirtual: true
+    };
+    edges.push(edge);
+    updateEdges();
 }
 
 // Render a single node
@@ -1026,6 +1130,18 @@ function updateEdges() {
         line.dataset.id = edge.id;
         line.style.pointerEvents = 'stroke';
 
+        // Apply weight-based styling for virtual edges
+        if (edge.isVirtual && edge.weight !== undefined) {
+            // Scale weight to stroke width (2-8px)
+            const strokeWidth = 2 + edge.weight * 6;
+            // Use inline styles to override CSS rules
+            line.style.stroke = '#ff6b6b';
+            line.style.strokeWidth = strokeWidth + 'px';
+            line.style.strokeOpacity = '0.8';
+            line.classList.add('virtual-edge');
+            line.dataset.weight = edge.weight.toFixed(3);
+        }
+
         line.addEventListener('click', (e) => {
             e.stopPropagation();
             if (e.ctrlKey || e.metaKey) {
@@ -1090,3 +1206,212 @@ document.addEventListener('keydown', (e) => {
         }
     }
 });
+
+// ============================================
+// Virtual Weights Visualization (Grid-based)
+// ============================================
+
+const btnVirtualWeights = document.getElementById('btn-virtual-weights');
+const gridEdgesSvg = document.getElementById('grid-edges-svg');
+
+// Toggle virtual weights visibility
+btnVirtualWeights.addEventListener('click', () => {
+    if (!virtualWeightsData) return;
+
+    virtualWeightsVisible = !virtualWeightsVisible;
+    btnVirtualWeights.classList.toggle('active', virtualWeightsVisible);
+
+    if (virtualWeightsVisible) {
+        renderVirtualWeightsInGrid();
+    } else {
+        clearVirtualWeightsFromGrid();
+    }
+});
+
+// Find latent box element in grid by layer, position, and feature
+function findLatentBox(layer, pos, feature) {
+    const selector = `.latent-box[data-layer="${layer}"][data-pos="${pos}"][data-latent="${feature}"]`;
+    return gridBody.querySelector(selector);
+}
+
+// Get center position of an element relative to grid-container (visual position)
+function getElementCenterInGrid(element) {
+    const gridContainer = document.getElementById('grid-container');
+    const containerRect = gridContainer.getBoundingClientRect();
+    const elemRect = element.getBoundingClientRect();
+
+    // Calculate visual position relative to grid-container (no scroll offset)
+    return {
+        x: elemRect.left - containerRect.left + elemRect.width / 2,
+        y: elemRect.top - containerRect.top + elemRect.height / 2
+    };
+}
+
+// Render virtual weights as edges in the grid
+function renderVirtualWeightsInGrid() {
+    clearVirtualWeightsFromGrid();
+
+    if (!virtualWeightsData || virtualWeightsData.length === 0) return;
+
+    // Find min/max weight for edge thickness scaling
+    let minWeight = Infinity, maxWeight = -Infinity;
+    for (const edge of virtualWeightsData) {
+        const weight = edge[6];
+        minWeight = Math.min(minWeight, weight);
+        maxWeight = Math.max(maxWeight, weight);
+    }
+
+    // Create edges connecting latent boxes
+    for (const edgeData of virtualWeightsData) {
+        const [srcPos, srcLayer, srcFeature, tgtPos, tgtLayer, tgtFeature, weight] = edgeData;
+
+        // Find the source and target latent boxes
+        const srcBox = findLatentBox(srcLayer, srcPos, srcFeature);
+        const tgtBox = findLatentBox(tgtLayer, tgtPos, tgtFeature);
+
+        if (!srcBox || !tgtBox) {
+            console.warn(`Could not find latent boxes for edge: L${srcLayer}/P${srcPos}/F${srcFeature} -> L${tgtLayer}/P${tgtPos}/F${tgtFeature}`);
+            continue;
+        }
+
+        // Get positions
+        const srcCenter = getElementCenterInGrid(srcBox);
+        const tgtCenter = getElementCenterInGrid(tgtBox);
+
+        // Calculate edge thickness based on weight (2px to 8px)
+        const normalizedWeight = maxWeight === minWeight ? 0.5 : (weight - minWeight) / (maxWeight - minWeight);
+        const strokeWidth = 2 + normalizedWeight * 6;
+
+        // Create SVG line
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', srcCenter.x);
+        line.setAttribute('y1', srcCenter.y);
+        line.setAttribute('x2', tgtCenter.x);
+        line.setAttribute('y2', tgtCenter.y);
+        line.setAttribute('stroke', '#ff6b6b');
+        line.setAttribute('stroke-width', strokeWidth);
+        line.setAttribute('stroke-opacity', '0.8');
+        line.setAttribute('stroke-linecap', 'round');
+        line.classList.add('virtual-weight-edge');
+        line.dataset.weight = weight.toFixed(3);
+        line.dataset.srcLayer = srcLayer;
+        line.dataset.srcPos = srcPos;
+        line.dataset.srcFeature = srcFeature;
+        line.dataset.tgtLayer = tgtLayer;
+        line.dataset.tgtPos = tgtPos;
+        line.dataset.tgtFeature = tgtFeature;
+
+        // Add hover tooltip
+        line.addEventListener('mouseenter', showGridEdgeTooltip);
+        line.addEventListener('mouseleave', hideGridEdgeTooltip);
+        line.addEventListener('mousemove', moveGridEdgeTooltip);
+
+        // Highlight connected boxes on hover
+        line.addEventListener('mouseenter', () => {
+            srcBox.classList.add('edge-highlight');
+            tgtBox.classList.add('edge-highlight');
+        });
+        line.addEventListener('mouseleave', () => {
+            srcBox.classList.remove('edge-highlight');
+            tgtBox.classList.remove('edge-highlight');
+        });
+
+        gridEdgesSvg.appendChild(line);
+        virtualWeightsEdges.push({
+            line,
+            srcBox,
+            tgtBox,
+            srcLayer, srcPos, srcFeature,
+            tgtLayer, tgtPos, tgtFeature,
+            weight
+        });
+    }
+}
+
+// Clear virtual weights from grid
+function clearVirtualWeightsFromGrid() {
+    // Remove all edge lines
+    gridEdgesSvg.innerHTML = '';
+    virtualWeightsEdges = [];
+
+    // Remove any highlights
+    gridBody.querySelectorAll('.edge-highlight').forEach(el => {
+        el.classList.remove('edge-highlight');
+    });
+}
+
+// Update edge positions when grid scrolls
+function updateGridEdgePositions() {
+    if (!virtualWeightsVisible || virtualWeightsEdges.length === 0) return;
+
+    for (const edge of virtualWeightsEdges) {
+        const srcBox = findLatentBox(edge.srcLayer, edge.srcPos, edge.srcFeature);
+        const tgtBox = findLatentBox(edge.tgtLayer, edge.tgtPos, edge.tgtFeature);
+
+        if (srcBox && tgtBox) {
+            const srcCenter = getElementCenterInGrid(srcBox);
+            const tgtCenter = getElementCenterInGrid(tgtBox);
+
+            edge.line.setAttribute('x1', srcCenter.x);
+            edge.line.setAttribute('y1', srcCenter.y);
+            edge.line.setAttribute('x2', tgtCenter.x);
+            edge.line.setAttribute('y2', tgtCenter.y);
+        }
+    }
+}
+
+// Update edges when grid scrolls
+gridBody.addEventListener('scroll', updateGridEdgePositions);
+
+// Edge tooltip for grid
+let gridEdgeTooltip = null;
+
+function createGridEdgeTooltip() {
+    if (!gridEdgeTooltip) {
+        gridEdgeTooltip = document.createElement('div');
+        gridEdgeTooltip.className = 'edge-tooltip';
+        gridEdgeTooltip.style.display = 'none';
+        document.body.appendChild(gridEdgeTooltip);
+    }
+    return gridEdgeTooltip;
+}
+
+function showGridEdgeTooltip(e) {
+    const tooltip = createGridEdgeTooltip();
+    const weight = e.target.dataset.weight;
+    const srcInfo = `L${e.target.dataset.srcLayer}/P${e.target.dataset.srcPos}/F${e.target.dataset.srcFeature}`;
+    const tgtInfo = `L${e.target.dataset.tgtLayer}/P${e.target.dataset.tgtPos}/F${e.target.dataset.tgtFeature}`;
+
+    tooltip.innerHTML = `
+        <div class="edge-tooltip-weight">Weight: ${weight}</div>
+        <div class="edge-tooltip-path">${srcInfo} → ${tgtInfo}</div>
+    `;
+    tooltip.style.display = 'block';
+
+    const x = e.clientX + 15;
+    const y = e.clientY - 40;
+    tooltip.style.left = x + 'px';
+    tooltip.style.top = y + 'px';
+
+    // Highlight the edge
+    e.target.setAttribute('stroke-opacity', '1');
+    e.target.setAttribute('stroke', '#fff');
+}
+
+function hideGridEdgeTooltip(e) {
+    if (gridEdgeTooltip) {
+        gridEdgeTooltip.style.display = 'none';
+    }
+    // Restore edge style
+    e.target.setAttribute('stroke-opacity', '0.8');
+    e.target.setAttribute('stroke', '#ff6b6b');
+}
+
+function moveGridEdgeTooltip(e) {
+    if (gridEdgeTooltip && gridEdgeTooltip.style.display !== 'none') {
+        const x = e.clientX + 15;
+        const y = e.clientY - 40;
+        gridEdgeTooltip.style.left = x + 'px';
+        gridEdgeTooltip.style.top = y + 'px';
+    }
+}

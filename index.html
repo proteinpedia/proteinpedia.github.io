@@ -28,6 +28,10 @@
                     <span class="status-icon">○</span>
                     <span class="file-name">top_activations.json</span>
                 </div>
+                <div class="file-status optional" id="status-virtual">
+                    <span class="status-icon">○</span>
+                    <span class="file-name">virtual_weights.json (optional)</span>
+                </div>
             </div>
             <button id="btn-load" disabled>Load Data</button>
         </div>
@@ -62,6 +66,7 @@
                 <div class="layer-label">Layer 0</div>
             </div>
             <div id="grid-body"></div>
+            <svg id="grid-edges-svg"></svg>
         </div>
 
         <!-- Sequence Bar -->
@@ -70,11 +75,12 @@
         </div>
 
         <!-- Canvas Section -->
-        <div id="canvas-section" style="display: none;">
+        <div id="canvas-section">
             <div id="canvas-toolbar">
                 <button id="btn-connect">Connect</button>
                 <button id="btn-combine">Combine</button>
                 <button id="btn-delete">Delete</button>
+                <button id="btn-virtual-weights" disabled>Virtual Weights</button>
                 <button id="btn-fullscreen">Fullscreen</button>
             </div>
             <div id="canvas-container">
