@@ -343,6 +343,8 @@ body {
 /* Canvas Section */
 #canvas-section {
     height: 300px;
+    min-height: 150px;
+    max-height: 80vh;
     display: flex;
     flex-direction: column;
     background: #0f0f1a;
@@ -392,6 +394,24 @@ body {
     background: #9a3830;
 }
 
+#btn-save-canvas {
+    background: #2a5a3a;
+    color: #fff;
+}
+
+#btn-save-canvas:hover {
+    background: #3a7a5a;
+}
+
+#btn-load-canvas {
+    background: #5a3a2a;
+    color: #fff;
+}
+
+#btn-load-canvas:hover {
+    background: #7a5a3a;
+}
+
 #btn-fullscreen {
     background: #1a5a3e;
     color: #fff;
@@ -417,6 +437,46 @@ body {
     flex: 1;
     position: relative;
     overflow: hidden;
+}
+
+/* Canvas Resize Handle */
+#canvas-resize-handle {
+    height: 8px;
+    background: #16213e;
+    border-top: 1px solid #333;
+    cursor: ns-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+#canvas-resize-handle::before {
+    content: '';
+    width: 40px;
+    height: 4px;
+    background: #444;
+    border-radius: 2px;
+    transition: background 0.2s;
+}
+
+#canvas-resize-handle:hover,
+#canvas-resize-handle.dragging {
+    background: #1a2a4e;
+}
+
+#canvas-resize-handle:hover::before,
+#canvas-resize-handle.dragging::before {
+    background: #00d9ff;
+}
+
+body.resizing-canvas {
+    user-select: none;
+    cursor: ns-resize !important;
+}
+
+#canvas-section.fullscreen #canvas-resize-handle {
+    display: none;
 }
 
 #edges-svg {

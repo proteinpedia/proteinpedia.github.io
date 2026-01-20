@@ -1634,6 +1634,146 @@ btnFullscreen.addEventListener('click', () => {
     setTimeout(updateEdges, 100);
 });
 
+// Save/Load Canvas State
+const btnSaveCanvas = document.getElementById('btn-save-canvas');
+const btnLoadCanvas = document.getElementById('btn-load-canvas');
+const canvasFileInput = document.getElementById('canvas-file-input');
+
+function saveCanvasState() {
+    const state = {
+        version: 1,
+        timestamp: new Date().toISOString(),
+        nodeIdCounter: nodeIdCounter,
+        edgeIdCounter: edgeIdCounter,
+        canvasNodes: canvasNodes,
+        edges: edges.filter(e => !e.isVirtual) // Only save user-created edges
+    };
+
+    const json = JSON.stringify(state, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `canvas-state-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function clearCanvas() {
+    nodesContainer.innerHTML = '';
+    canvasNodes = [];
+    edges = [];
+    selectedNodes.clear();
+    selectedEdges.clear();
+    edgesSvg.innerHTML = '';
+}
+
+function loadCanvasState(jsonText) {
+    try {
+        const state = JSON.parse(jsonText);
+
+        if (!state.canvasNodes || !state.edges) {
+            throw new Error('Invalid canvas state file');
+        }
+
+        clearCanvas();
+
+        nodeIdCounter = state.nodeIdCounter || 0;
+        edgeIdCounter = state.edgeIdCounter || 0;
+
+        // First restore all nodes
+        canvasNodes = state.canvasNodes;
+        for (const node of canvasNodes) {
+            renderNode(node);
+        }
+
+        // Restore user-created edges
+        edges = state.edges;
+
+        // Recreate virtual edges based on virtual weights data
+        for (const node of canvasNodes) {
+            if (!node.isSuper) {
+                checkAndCreateVirtualEdges(node);
+            }
+        }
+
+        updateEdges();
+
+    } catch (err) {
+        console.error('Error loading canvas state:', err);
+        alert('Error loading canvas state. Please check the file format.');
+    }
+}
+
+btnSaveCanvas.addEventListener('click', saveCanvasState);
+
+btnLoadCanvas.addEventListener('click', () => {
+    canvasFileInput.click();
+});
+
+canvasFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        const text = await file.text();
+        loadCanvasState(text);
+        canvasFileInput.value = '';
+    }
+});
+
+// Canvas Section Resize
+const canvasResizeHandle = document.getElementById('canvas-resize-handle');
+let canvasResizeState = null;
+
+function startCanvasResize(e) {
+    if (e.button !== 0) return;
+
+    e.preventDefault();
+
+    const canvasSectionRect = canvasSection.getBoundingClientRect();
+
+    canvasResizeState = {
+        startY: e.clientY,
+        startHeight: canvasSectionRect.height
+    };
+
+    canvasResizeHandle.classList.add('dragging');
+    document.body.classList.add('resizing-canvas');
+
+    document.addEventListener('mousemove', onCanvasResize);
+    document.addEventListener('mouseup', endCanvasResize);
+}
+
+function onCanvasResize(e) {
+    if (!canvasResizeState) return;
+
+    const deltaY = e.clientY - canvasResizeState.startY;
+    let newHeight = canvasResizeState.startHeight + deltaY;
+
+    const minHeight = 150;
+    const maxHeight = window.innerHeight * 0.8;
+    newHeight = Math.max(minHeight, Math.min(maxHeight, newHeight));
+
+    canvasSection.style.height = newHeight + 'px';
+
+    updateEdges();
+}
+
+function endCanvasResize() {
+    canvasResizeState = null;
+    canvasResizeHandle.classList.remove('dragging');
+    document.body.classList.remove('resizing-canvas');
+
+    document.removeEventListener('mousemove', onCanvasResize);
+    document.removeEventListener('mouseup', endCanvasResize);
+
+    updateEdges();
+}
+
+canvasResizeHandle.addEventListener('mousedown', startCanvasResize);
+
 // Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Delete' || e.key === 'Backspace') {
