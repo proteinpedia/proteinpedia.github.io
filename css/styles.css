@@ -262,16 +262,16 @@ body {
 }
 
 .grid-cell {
-    padding: 6px;
+    padding: 4px 6px;
     border-right: 1px solid #222;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    min-width: 80px;
-    max-width: 80px;
+    display: inline-flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 4px;
     align-items: center;
-    overflow-x: hidden;
-    overflow-y: auto;
+    justify-content: center;
+    flex-shrink: 0;
+    box-sizing: border-box;
 }
 
 .grid-cell:hover {
@@ -279,8 +279,8 @@ body {
 }
 
 .latent-box {
-    padding: 3px 6px;
-    font-size: 11px;
+    padding: 2px 4px;
+    font-size: 10px;
     border-radius: 3px;
     cursor: pointer;
     transition: transform 0.1s, box-shadow 0.1s;
@@ -312,13 +312,13 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-width: 80px;
-    max-width: 80px;
-    padding: 8px 0;
+    padding: 4px 6px;
     font-size: 14px;
     cursor: pointer;
     border-right: 1px solid #333;
     transition: background 0.2s;
+    flex-shrink: 0;
+    box-sizing: border-box;
 }
 
 .seq-item:hover {
@@ -451,6 +451,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
+    pointer-events: none;
 }
 
 .canvas-node {
@@ -465,6 +466,7 @@ body {
     min-width: 80px;
     text-align: center;
     transition: border-color 0.2s, box-shadow 0.2s;
+    pointer-events: auto;
 }
 
 .canvas-node:hover {
@@ -1127,4 +1129,274 @@ body {
 .virtual-edge:hover {
     stroke: #fff !important;
     stroke-opacity: 1 !important;
+}
+
+/* ============================================
+   Layer Panel Styles
+   ============================================ */
+
+#layer-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 50%;
+    height: 100vh;
+    background: #1a1a2e;
+    border-right: 2px solid #333;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+    transition: transform 0.3s ease;
+}
+
+#layer-panel.hidden {
+    transform: translateX(-100%);
+}
+
+#layer-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: #16213e;
+    border-bottom: 2px solid #333;
+}
+
+#layer-panel-header h2 {
+    font-size: 18px;
+    color: #00d9ff;
+    margin: 0;
+}
+
+#layer-panel-close {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 28px;
+    cursor: pointer;
+    padding: 0 8px;
+    line-height: 1;
+}
+
+#layer-panel-close:hover {
+    color: #ff6b6b;
+}
+
+#layer-panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+/* Layer label clickable styling */
+.layer-label {
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.layer-label:hover {
+    background: #0f3460;
+    color: #00d9ff;
+}
+
+/* Latent ranking card */
+.latent-rank-card {
+    background: #16213e;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.latent-rank-card:hover {
+    box-shadow: 0 0 12px rgba(0, 217, 255, 0.3);
+    transform: translateX(4px);
+}
+
+.latent-rank-header {
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    background: #0f3460;
+    gap: 16px;
+}
+
+.latent-rank-number {
+    font-size: 14px;
+    font-weight: bold;
+    color: #888;
+    min-width: 30px;
+}
+
+.latent-rank-info {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.latent-rank-idx {
+    font-weight: bold;
+    color: #00d9ff;
+    font-size: 14px;
+}
+
+.latent-rank-max {
+    color: #ff6b6b;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.latent-rank-pos {
+    color: #aaa;
+    font-size: 12px;
+    font-family: 'Courier New', monospace;
+}
+
+/* Latent rank card actions */
+.latent-rank-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.latent-rank-actions button {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.btn-add-supernode {
+    background: #533483;
+    color: #fff;
+}
+
+.btn-add-supernode:hover {
+    background: #6b44a8;
+    transform: scale(1.05);
+}
+
+.btn-feature-info {
+    background: #0f3460;
+    color: #00d9ff;
+}
+
+.btn-feature-info:hover {
+    background: #1a5080;
+    transform: scale(1.05);
+}
+
+/* Latent heatmap */
+.latent-heatmap {
+    padding: 10px 16px;
+    overflow-x: auto;
+}
+
+.latent-heatmap .seq-amino-acids {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 1px;
+    font-family: 'Courier New', monospace;
+}
+
+/* Max position highlight in heatmap */
+.aa-char.max-highlight {
+    outline: 2px solid #00d9ff;
+    outline-offset: 1px;
+    z-index: 5;
+    position: relative;
+}
+
+/* ============================================
+   Edge Filter Slider Styles
+   ============================================ */
+
+#edge-filter-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 24px;
+    padding-left: 24px;
+    border-left: 1px solid #444;
+}
+
+#edge-filter-control.hidden {
+    display: none;
+}
+
+.filter-label {
+    font-size: 12px;
+    font-weight: bold;
+    color: #aaa;
+}
+
+#edge-threshold-slider {
+    width: 120px;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #333;
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+}
+
+#edge-threshold-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: #00d9ff;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#edge-threshold-slider::-webkit-slider-thumb:hover {
+    background: #4de8ff;
+}
+
+#edge-threshold-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: #00d9ff;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+#edge-threshold-input {
+    width: 45px;
+    padding: 4px 6px;
+    font-size: 12px;
+    font-weight: bold;
+    color: #00d9ff;
+    background: #1a1a2e;
+    border: 1px solid #444;
+    border-radius: 4px;
+    text-align: center;
+    -moz-appearance: textfield;
+}
+
+#edge-threshold-input::-webkit-outer-spin-button,
+#edge-threshold-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+#edge-threshold-input:focus {
+    outline: none;
+    border-color: #00d9ff;
+}
+
+.percent-sign {
+    font-size: 12px;
+    font-weight: bold;
+    color: #00d9ff;
 }

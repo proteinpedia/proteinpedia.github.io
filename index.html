@@ -47,12 +47,27 @@
             <div id="activation-panel-content"></div>
         </div>
 
+        <!-- Layer Panel (hidden by default) -->
+        <div id="layer-panel" class="hidden">
+            <div id="layer-panel-header">
+                <h2 id="layer-panel-title">Layer Latent Rankings</h2>
+                <button id="layer-panel-close">&times;</button>
+            </div>
+            <div id="layer-panel-content"></div>
+        </div>
+
         <!-- Color Legend -->
         <div id="color-legend">
             <span class="legend-label">Activation:</span>
             <div class="legend-gradient"></div>
             <span class="legend-min">Low</span>
             <span class="legend-max">High</span>
+            <div id="edge-filter-control" class="hidden">
+                <span class="filter-label">Show Top:</span>
+                <input type="range" id="edge-threshold-slider" min="1" max="100" value="10" />
+                <input type="number" id="edge-threshold-input" min="1" max="100" value="10" />
+                <span class="percent-sign">%</span>
+            </div>
         </div>
 
         <!-- Grid Section -->

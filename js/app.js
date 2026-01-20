@@ -12,6 +12,8 @@ let edgeIdCounter = 0;
 let dragState = null;
 let virtualWeightsVisible = false;  // Toggle state for virtual weights
 let virtualWeightsEdges = [];       // Edges created from virtual weights
+let aggregatedVirtualWeights = new Map();  // Averaged weights by (layer, latent) pairs
+let virtualWeightsThreshold = 10;  // Show top x% of edges by absolute magnitude
 
 // File upload state
 let uploadedFiles = {
@@ -116,6 +118,8 @@ btnLoad.addEventListener('click', async () => {
         // Parse virtual weights if present
         if (results[3]) {
             virtualWeightsData = JSON.parse(results[3]);
+            // Precompute averaged weights by (layer, latent) pairs
+            preprocessVirtualWeights();
             // Enable the virtual weights toggle button
             const btnVirtualWeights = document.getElementById('btn-virtual-weights');
             if (btnVirtualWeights) {
@@ -160,6 +164,12 @@ const activationPanel = document.getElementById('activation-panel');
 const panelTitle = document.getElementById('panel-title');
 const panelContent = document.getElementById('activation-panel-content');
 const panelClose = document.getElementById('panel-close');
+
+// Layer panel elements
+const layerPanel = document.getElementById('layer-panel');
+const layerPanelTitle = document.getElementById('layer-panel-title');
+const layerPanelContent = document.getElementById('layer-panel-content');
+const layerPanelClose = document.getElementById('layer-panel-close');
 
 // Sync scroll between grid and sequence bar
 let isSyncing = false;
@@ -234,10 +244,30 @@ function updateLegend() {
     if (legendMax) legendMax.textContent = max.toFixed(2);
 }
 
+// Compute maximum latents per position across all layers
+function computeColumnWidths() {
+    const numPositions = sequence.length;
+    const maxLatentsPerPos = new Array(numPositions).fill(0);
+
+    for (let layer = 0; layer <= 5; layer++) {
+        for (let pos = 0; pos < numPositions; pos++) {
+            const items = activationData[layer]?.[pos] || [];
+            maxLatentsPerPos[pos] = Math.max(maxLatentsPerPos[pos], items.length);
+        }
+    }
+    return maxLatentsPerPos;
+}
+
 // Render grid - layers as rows, positions as columns
 function renderGrid() {
     const { min, max } = getValueRange();
     const numPositions = sequence.length;
+    const maxLatentsPerPos = computeColumnWidths();
+
+    // Base width per latent box (approx 28px per box + 4px gap)
+    const boxWidth = 32;
+    const minCellWidth = 42;
+    const cellPaddingAndBorder = 13; // 12px padding (6px each side) + 1px border
 
     let html = '';
     // Each row is a layer (reversed: 5 to 0)
@@ -245,7 +275,8 @@ function renderGrid() {
         html += `<div class="grid-row" data-layer="${layer}">`;
         // Each column is a position
         for (let pos = 0; pos < numPositions; pos++) {
-            html += `<div class="grid-cell" data-layer="${layer}" data-pos="${pos}">`;
+            const cellWidth = Math.max(minCellWidth, maxLatentsPerPos[pos] * boxWidth + cellPaddingAndBorder);
+            html += `<div class="grid-cell" data-layer="${layer}" data-pos="${pos}" style="width: ${cellWidth}px; min-width: ${cellWidth}px;">`;
             const items = activationData[layer]?.[pos] || [];
             for (const item of items) {
                 const color = getActivationColor(item.value, min, max);
@@ -267,6 +298,9 @@ function renderGrid() {
     }
     gridBody.innerHTML = html;
 
+    // Store column widths for sequence bar
+    window.columnWidths = maxLatentsPerPos.map(count => Math.max(minCellWidth, count * boxWidth + cellPaddingAndBorder));
+
     // Add click handlers
     gridBody.querySelectorAll('.latent-box').forEach(box => {
         box.addEventListener('click', handleLatentClick);
@@ -276,8 +310,10 @@ function renderGrid() {
 // Render sequence bar
 function renderSequence() {
     let html = '';
+    const widths = window.columnWidths || [];
     for (let i = 0; i < sequence.length; i++) {
-        html += `<div class="seq-item" data-pos="${i}">
+        const width = widths[i] || 36;
+        html += `<div class="seq-item" data-pos="${i}" style="width: ${width}px; min-width: ${width}px;">
             <span class="seq-aa">${sequence[i]}</span>
             <span class="seq-pos">${i}</span>
         </div>`;
@@ -725,9 +761,49 @@ function getActivationColorForPanel(value, minVal, maxVal) {
     return `rgb(${r}, ${g}, ${b})`;
 }
 
+// Color scale for edge weights (blue for negative, red for positive)
+function getEdgeColor(weight, minWeight, maxWeight) {
+    // Handle edge case where all weights are the same
+    if (maxWeight === minWeight) {
+        return weight >= 0 ? 'rgb(255, 100, 100)' : 'rgb(100, 100, 255)';
+    }
+
+    // Normalize weight to [-1, 1] range based on the maximum absolute value
+    const maxAbs = Math.max(Math.abs(minWeight), Math.abs(maxWeight));
+    const normalized = maxAbs === 0 ? 0 : weight / maxAbs;
+
+    // Create a diverging color scale: blue (-1) -> white (0) -> red (+1)
+    let r, g, b;
+
+    if (normalized < 0) {
+        // Negative: white to blue
+        // At -1: rgb(0, 100, 255) - strong blue
+        // At 0: rgb(255, 255, 255) - white
+        const t = Math.abs(normalized);
+        r = Math.round(255 * (1 - t));
+        g = Math.round(255 * (1 - t * 0.6));
+        b = 255;
+    } else {
+        // Positive: white to red
+        // At 0: rgb(255, 255, 255) - white
+        // At +1: rgb(255, 50, 50) - strong red
+        const t = normalized;
+        r = 255;
+        g = Math.round(255 * (1 - t * 0.8));
+        b = Math.round(255 * (1 - t * 0.8));
+    }
+
+    return `rgb(${r}, ${g}, ${b})`;
+}
+
 // Close panel handler
 panelClose.addEventListener('click', () => {
     activationPanel.classList.add('hidden');
+});
+
+// Close layer panel handler
+layerPanelClose.addEventListener('click', () => {
+    layerPanel.classList.add('hidden');
 });
 
 // Tooltip for amino acid hover
@@ -782,14 +858,151 @@ panelContent.addEventListener('mouseover', showAATooltip);
 panelContent.addEventListener('mouseout', hideAATooltip);
 panelContent.addEventListener('mousemove', moveAATooltip);
 
+// Add tooltip listeners to layer panel content
+layerPanelContent.addEventListener('mouseover', showAATooltip);
+layerPanelContent.addEventListener('mouseout', hideAATooltip);
+layerPanelContent.addEventListener('mousemove', moveAATooltip);
+
+// ============================================
+// Layer Panel - Latent Rankings by Max Activation
+// ============================================
+
+// Setup layer label click handlers
+document.querySelectorAll('.layer-label').forEach((label, index) => {
+    label.addEventListener('click', () => {
+        // Labels are ordered 5 to 0 in the DOM
+        const layer = 5 - index;
+        showLayerPanel(layer);
+    });
+});
+
+// Show layer panel with latent rankings for a specific layer
+function showLayerPanel(layer) {
+    layerPanelTitle.textContent = `Layer ${layer} - Latent Rankings`;
+
+    // Collect all latents for this layer with their max activations
+    const latentMaxActivations = [];
+    const layerData = activationData[layer];
+
+    if (layerData) {
+        // Collect all unique latent indices
+        const latentSet = new Set();
+        for (const pos in layerData) {
+            for (const item of layerData[pos]) {
+                latentSet.add(item.latentIdx);
+            }
+        }
+
+        // For each latent, find max activation and position
+        for (const latentIdx of latentSet) {
+            const activations = getWildTypeActivations(layer, latentIdx);
+            let maxVal = 0;
+            let maxPos = 0;
+            activations.forEach((val, pos) => {
+                if (val > maxVal) {
+                    maxVal = val;
+                    maxPos = pos;
+                }
+            });
+            latentMaxActivations.push({ latentIdx, maxVal, maxPos, activations });
+        }
+    }
+
+    // Sort by max activation descending
+    latentMaxActivations.sort((a, b) => b.maxVal - a.maxVal);
+
+    // Render panel content
+    renderLayerPanelContent(layer, latentMaxActivations);
+
+    // Show panel
+    layerPanel.classList.remove('hidden');
+}
+
+// Render the layer panel content with ranked latents
+function renderLayerPanelContent(layer, latentMaxActivations) {
+    if (latentMaxActivations.length === 0) {
+        layerPanelContent.innerHTML = '<div class="no-data-message">No latents found for this layer.</div>';
+        return;
+    }
+
+    let html = '';
+
+    latentMaxActivations.forEach((item, index) => {
+        const { latentIdx, maxVal, maxPos, activations } = item;
+        const aa = sequence[maxPos];
+        const maxActivation = maxVal;
+
+        // Build heatmap of activations
+        let heatmapHtml = '';
+        for (let i = 0; i < sequence.length; i++) {
+            const seqAa = sequence[i];
+            const activation = activations[i] || 0;
+            const isMax = i === maxPos;
+
+            if (activation === 0) {
+                heatmapHtml += `<span class="aa-char zero${isMax ? ' max-highlight' : ''}" data-pos="${i}" data-aa="${seqAa}" data-activation="0.00">${seqAa}</span>`;
+            } else {
+                const color = getActivationColorForPanel(activation, 0, maxActivation);
+                const textColor = activation > maxActivation * 0.5 ? '#000' : '#fff';
+                heatmapHtml += `<span class="aa-char${isMax ? ' max-highlight' : ''}" data-pos="${i}" data-aa="${seqAa}" data-activation="${activation.toFixed(2)}" style="background: ${color}; color: ${textColor}">${seqAa}</span>`;
+            }
+        }
+
+        html += `
+            <div class="latent-rank-card" data-layer="${layer}" data-latent="${latentIdx}" data-pos="${maxPos}">
+                <div class="latent-rank-header">
+                    <span class="latent-rank-number">#${index + 1}</span>
+                    <div class="latent-rank-info">
+                        <span class="latent-rank-idx">Latent ${latentIdx}</span>
+                        <span class="latent-rank-max">Max: ${maxVal.toFixed(3)}</span>
+                        <span class="latent-rank-pos">@ Pos ${maxPos} (${aa})</span>
+                    </div>
+                    <div class="latent-rank-actions">
+                        <button class="btn-add-supernode" title="Add supernode to canvas">Add Supernode</button>
+                        <button class="btn-feature-info" title="View feature information">Feature Info</button>
+                    </div>
+                </div>
+                <div class="latent-heatmap">
+                    <div class="seq-amino-acids">${heatmapHtml}</div>
+                </div>
+            </div>
+        `;
+    });
+
+    layerPanelContent.innerHTML = html;
+
+    // Add click handlers for Feature Info buttons
+    layerPanelContent.querySelectorAll('.btn-feature-info').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const card = btn.closest('.latent-rank-card');
+            const cardLayer = parseInt(card.dataset.layer);
+            const latentIdx = parseInt(card.dataset.latent);
+            const pos = parseInt(card.dataset.pos);
+            const activations = getWildTypeActivations(cardLayer, latentIdx);
+            const value = activations[pos] || 0;
+
+            // Open the activation panel for this latent
+            showActivationPanel(cardLayer, latentIdx, pos, value);
+        });
+    });
+
+    // Add click handlers for Add Supernode buttons (placeholder - no functionality yet)
+    layerPanelContent.querySelectorAll('.btn-add-supernode').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // TODO: Implement add supernode functionality
+        });
+    });
+}
+
 // Add node to canvas
 function addNodeToCanvas(latentIdx, layer, pos, aa, value, isSuper = false, children = []) {
-    // Prevent duplicate nodes (same layer/pos/latentIdx)
+    // Prevent duplicate nodes (same layer/latentIdx)
     if (!isSuper) {
         const existingNode = canvasNodes.find(n =>
             !n.isSuper &&
             n.layer === layer &&
-            n.pos === pos &&
             n.latentIdx === latentIdx
         );
         if (existingNode) {
@@ -836,34 +1049,55 @@ function addNodeToCanvas(latentIdx, layer, pos, aa, value, isSuper = false, chil
     return node;
 }
 
-// Find a canvas node by pos, layer, and latentIdx (feature)
-function findCanvasNode(pos, layer, latentIdx) {
+// Find a canvas node by layer and latentIdx (feature)
+function findCanvasNode(layer, latentIdx) {
     return canvasNodes.find(n =>
         !n.isSuper &&
-        n.pos === pos &&
         n.layer === layer &&
         n.latentIdx === latentIdx
     );
 }
 
-// Check virtualWeightsData and create edges for connected nodes
-function checkAndCreateVirtualEdges(newNode) {
+// Precompute averaged weights by (layer, latent) pairs across all positions
+function preprocessVirtualWeights() {
+    aggregatedVirtualWeights.clear();
     if (!virtualWeightsData) return;
 
     for (const [srcPos, srcLayer, srcFeature, tgtPos, tgtLayer, tgtFeature, weight] of virtualWeightsData) {
-        // Check if newNode is source and target exists in canvas
-        if (newNode.pos === srcPos && newNode.layer === srcLayer && newNode.latentIdx === srcFeature) {
-            const targetNode = findCanvasNode(tgtPos, tgtLayer, tgtFeature);
-            if (targetNode) {
-                createVirtualEdge(newNode, targetNode, weight);
-            }
+        // Create canonical key (smaller layer-latent first for consistency)
+        const key1 = `${srcLayer}-${srcFeature}`;
+        const key2 = `${tgtLayer}-${tgtFeature}`;
+        const key = key1 < key2 ? `${key1}:${key2}` : `${key2}:${key1}`;
+
+        if (!aggregatedVirtualWeights.has(key)) {
+            aggregatedVirtualWeights.set(key, { totalWeight: 0, count: 0 });
         }
-        // Check if newNode is target and source exists in canvas
-        if (newNode.pos === tgtPos && newNode.layer === tgtLayer && newNode.latentIdx === tgtFeature) {
-            const sourceNode = findCanvasNode(srcPos, srcLayer, srcFeature);
-            if (sourceNode) {
-                createVirtualEdge(sourceNode, newNode, weight);
-            }
+        const entry = aggregatedVirtualWeights.get(key);
+        entry.totalWeight += weight;
+        entry.count += 1;
+    }
+
+    // Calculate averages
+    for (const entry of aggregatedVirtualWeights.values()) {
+        entry.avgWeight = entry.totalWeight / entry.count;
+    }
+}
+
+// Check aggregated virtual weights and create edges for connected nodes
+function checkAndCreateVirtualEdges(newNode) {
+    if (!virtualWeightsData || aggregatedVirtualWeights.size === 0) return;
+
+    for (const existingNode of canvasNodes) {
+        if (existingNode.isSuper || existingNode.id === newNode.id) continue;
+
+        // Create canonical key
+        const key1 = `${newNode.layer}-${newNode.latentIdx}`;
+        const key2 = `${existingNode.layer}-${existingNode.latentIdx}`;
+        const key = key1 < key2 ? `${key1}:${key2}` : `${key2}:${key1}`;
+
+        const weightData = aggregatedVirtualWeights.get(key);
+        if (weightData) {
+            createVirtualEdge(newNode, existingNode, weightData.avgWeight);
         }
     }
 }
@@ -904,8 +1138,7 @@ function renderNode(node) {
         `;
     } else {
         div.innerHTML = `
-            <div class="node-latent">L${node.latentIdx}</div>
-            <div class="node-info">Layer ${node.layer} | Pos ${node.pos} (${node.aa})</div>
+            <div class="node-latent">Layer ${node.layer} Latent ${node.latentIdx}</div>
         `;
     }
 
@@ -1102,9 +1335,39 @@ function deleteSelectedInternal(nodeIds) {
     }
 }
 
+// Canvas edge tooltip
+let canvasEdgeTooltip = null;
+
+function showEdgeTooltip(e, weight) {
+    if (!canvasEdgeTooltip) {
+        canvasEdgeTooltip = document.createElement('div');
+        canvasEdgeTooltip.className = 'edge-tooltip';
+        document.body.appendChild(canvasEdgeTooltip);
+    }
+    canvasEdgeTooltip.textContent = `Weight: ${weight.toFixed(3)}`;
+    canvasEdgeTooltip.style.display = 'block';
+    canvasEdgeTooltip.style.left = (e.clientX + 10) + 'px';
+    canvasEdgeTooltip.style.top = (e.clientY - 30) + 'px';
+}
+
+function hideEdgeTooltip() {
+    if (canvasEdgeTooltip) canvasEdgeTooltip.style.display = 'none';
+}
+
 // Update edge rendering
 function updateEdges() {
     edgesSvg.innerHTML = '';
+
+    // Find min/max weights for virtual edges to normalize colors
+    let minWeight = Infinity, maxWeight = -Infinity;
+    for (const edge of edges) {
+        if (edge.isVirtual && edge.weight !== undefined) {
+            minWeight = Math.min(minWeight, edge.weight);
+            maxWeight = Math.max(maxWeight, edge.weight);
+        }
+    }
+    if (!isFinite(minWeight)) minWeight = 0;
+    if (!isFinite(maxWeight)) maxWeight = 0;
 
     for (const edge of edges) {
         const fromNode = canvasNodes.find(n => n.id === edge.from);
@@ -1132,14 +1395,20 @@ function updateEdges() {
 
         // Apply weight-based styling for virtual edges
         if (edge.isVirtual && edge.weight !== undefined) {
-            // Scale weight to stroke width (2-8px)
-            const strokeWidth = 2 + edge.weight * 6;
+            // Scale stroke width based on weight magnitude (2-8px)
+            const maxAbsWeight = Math.max(Math.abs(minWeight), Math.abs(maxWeight));
+            const normalizedMagnitude = maxAbsWeight === 0 ? 0.5 : Math.abs(edge.weight) / maxAbsWeight;
+            const strokeWidth = 2 + normalizedMagnitude * 6;
+            // Get color based on weight sign and magnitude
+            const edgeColor = getEdgeColor(edge.weight, minWeight, maxWeight);
             // Use inline styles to override CSS rules
-            line.style.stroke = '#ff6b6b';
+            line.style.stroke = edgeColor;
             line.style.strokeWidth = strokeWidth + 'px';
-            line.style.strokeOpacity = '0.8';
+            line.style.strokeOpacity = '1';
             line.classList.add('virtual-edge');
             line.dataset.weight = edge.weight.toFixed(3);
+            line.dataset.color = edgeColor;
+            line.style.pointerEvents = 'none'; // Let hitArea handle events
         }
 
         line.addEventListener('click', (e) => {
@@ -1159,6 +1428,48 @@ function updateEdges() {
         });
 
         edgesSvg.appendChild(line);
+
+        // Create invisible wider line for better hover detection (on top of visible line)
+        if (edge.isVirtual && edge.weight !== undefined) {
+            const hitArea = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            hitArea.setAttribute('x1', fromX);
+            hitArea.setAttribute('y1', fromY);
+            hitArea.setAttribute('x2', toX);
+            hitArea.setAttribute('y2', toY);
+            hitArea.style.stroke = 'transparent';
+            hitArea.style.strokeWidth = '15px';
+            hitArea.style.pointerEvents = 'stroke';
+            hitArea.style.cursor = 'pointer';
+
+            // Add hover tooltip handlers
+            hitArea.addEventListener('mouseenter', (e) => showEdgeTooltip(e, edge.weight));
+            hitArea.addEventListener('mouseleave', hideEdgeTooltip);
+            hitArea.addEventListener('mousemove', (e) => {
+                if (canvasEdgeTooltip) {
+                    canvasEdgeTooltip.style.left = (e.clientX + 10) + 'px';
+                    canvasEdgeTooltip.style.top = (e.clientY - 30) + 'px';
+                }
+            });
+
+            // Also handle click on hitArea for selection
+            hitArea.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (e.ctrlKey || e.metaKey) {
+                    if (selectedEdges.has(edge.id)) {
+                        selectedEdges.delete(edge.id);
+                    } else {
+                        selectedEdges.add(edge.id);
+                    }
+                } else {
+                    selectedNodes.clear();
+                    selectedEdges.clear();
+                    selectedEdges.add(edge.id);
+                }
+                updateSelectionUI();
+            });
+
+            edgesSvg.appendChild(hitArea);
+        }
     }
 }
 
@@ -1196,8 +1507,10 @@ document.addEventListener('keydown', (e) => {
         }
     }
     if (e.key === 'Escape') {
-        // Close activation panel first if open
-        if (!activationPanel.classList.contains('hidden')) {
+        // Close panels first if open
+        if (!layerPanel.classList.contains('hidden')) {
+            layerPanel.classList.add('hidden');
+        } else if (!activationPanel.classList.contains('hidden')) {
             activationPanel.classList.add('hidden');
         } else if (canvasSection.classList.contains('fullscreen')) {
             canvasSection.classList.remove('fullscreen');
@@ -1213,6 +1526,9 @@ document.addEventListener('keydown', (e) => {
 
 const btnVirtualWeights = document.getElementById('btn-virtual-weights');
 const gridEdgesSvg = document.getElementById('grid-edges-svg');
+const edgeFilterControl = document.getElementById('edge-filter-control');
+const edgeThresholdSlider = document.getElementById('edge-threshold-slider');
+const edgeThresholdInput = document.getElementById('edge-threshold-input');
 
 // Toggle virtual weights visibility
 btnVirtualWeights.addEventListener('click', () => {
@@ -1222,10 +1538,41 @@ btnVirtualWeights.addEventListener('click', () => {
     btnVirtualWeights.classList.toggle('active', virtualWeightsVisible);
 
     if (virtualWeightsVisible) {
+        edgeFilterControl.classList.remove('hidden');
         renderVirtualWeightsInGrid();
     } else {
+        edgeFilterControl.classList.add('hidden');
         clearVirtualWeightsFromGrid();
     }
+});
+
+// Edge threshold slider handler
+edgeThresholdSlider.addEventListener('input', () => {
+    virtualWeightsThreshold = parseInt(edgeThresholdSlider.value);
+    edgeThresholdInput.value = virtualWeightsThreshold;
+    if (virtualWeightsVisible) {
+        renderVirtualWeightsInGrid();
+    }
+});
+
+// Edge threshold input handler
+edgeThresholdInput.addEventListener('input', () => {
+    let value = parseInt(edgeThresholdInput.value) || 1;
+    value = Math.max(1, Math.min(100, value));
+    virtualWeightsThreshold = value;
+    edgeThresholdSlider.value = value;
+    if (virtualWeightsVisible) {
+        renderVirtualWeightsInGrid();
+    }
+});
+
+// Clamp value on blur
+edgeThresholdInput.addEventListener('blur', () => {
+    let value = parseInt(edgeThresholdInput.value) || 1;
+    value = Math.max(1, Math.min(100, value));
+    edgeThresholdInput.value = value;
+    virtualWeightsThreshold = value;
+    edgeThresholdSlider.value = value;
 });
 
 // Find latent box element in grid by layer, position, and feature
@@ -1253,16 +1600,28 @@ function renderVirtualWeightsInGrid() {
 
     if (!virtualWeightsData || virtualWeightsData.length === 0) return;
 
-    // Find min/max weight for edge thickness scaling
+    // Filter edges based on threshold (top x% by absolute magnitude)
+    let edgesToRender = virtualWeightsData;
+    if (virtualWeightsThreshold < 100) {
+        // Sort by absolute weight magnitude (descending)
+        const sortedEdges = [...virtualWeightsData].sort((a, b) =>
+            Math.abs(b[6]) - Math.abs(a[6])
+        );
+        // Calculate how many edges to keep
+        const numToKeep = Math.ceil(sortedEdges.length * virtualWeightsThreshold / 100);
+        edgesToRender = sortedEdges.slice(0, numToKeep);
+    }
+
+    // Find min/max weight for edge thickness scaling (from filtered edges)
     let minWeight = Infinity, maxWeight = -Infinity;
-    for (const edge of virtualWeightsData) {
+    for (const edge of edgesToRender) {
         const weight = edge[6];
         minWeight = Math.min(minWeight, weight);
         maxWeight = Math.max(maxWeight, weight);
     }
 
     // Create edges connecting latent boxes
-    for (const edgeData of virtualWeightsData) {
+    for (const edgeData of edgesToRender) {
         const [srcPos, srcLayer, srcFeature, tgtPos, tgtLayer, tgtFeature, weight] = edgeData;
 
         // Find the source and target latent boxes
@@ -1278,9 +1637,13 @@ function renderVirtualWeightsInGrid() {
         const srcCenter = getElementCenterInGrid(srcBox);
         const tgtCenter = getElementCenterInGrid(tgtBox);
 
-        // Calculate edge thickness based on weight (2px to 8px)
-        const normalizedWeight = maxWeight === minWeight ? 0.5 : (weight - minWeight) / (maxWeight - minWeight);
-        const strokeWidth = 2 + normalizedWeight * 6;
+        // Calculate edge thickness based on weight magnitude (2px to 8px)
+        const maxAbsWeight = Math.max(Math.abs(minWeight), Math.abs(maxWeight));
+        const normalizedMagnitude = maxAbsWeight === 0 ? 0.5 : Math.abs(weight) / maxAbsWeight;
+        const strokeWidth = 2 + normalizedMagnitude * 6;
+
+        // Get color based on weight sign and magnitude (blue for negative, red for positive)
+        const edgeColor = getEdgeColor(weight, minWeight, maxWeight);
 
         // Create SVG line
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -1288,12 +1651,13 @@ function renderVirtualWeightsInGrid() {
         line.setAttribute('y1', srcCenter.y);
         line.setAttribute('x2', tgtCenter.x);
         line.setAttribute('y2', tgtCenter.y);
-        line.setAttribute('stroke', '#ff6b6b');
+        line.setAttribute('stroke', edgeColor);
         line.setAttribute('stroke-width', strokeWidth);
-        line.setAttribute('stroke-opacity', '0.8');
+        line.setAttribute('stroke-opacity', '0.5');
         line.setAttribute('stroke-linecap', 'round');
         line.classList.add('virtual-weight-edge');
         line.dataset.weight = weight.toFixed(3);
+        line.dataset.color = edgeColor;
         line.dataset.srcLayer = srcLayer;
         line.dataset.srcPos = srcPos;
         line.dataset.srcFeature = srcFeature;
@@ -1394,7 +1758,7 @@ function showGridEdgeTooltip(e) {
     tooltip.style.top = y + 'px';
 
     // Highlight the edge
-    e.target.setAttribute('stroke-opacity', '1');
+    e.target.setAttribute('stroke-opacity', '0.5');
     e.target.setAttribute('stroke', '#fff');
 }
 
@@ -1402,9 +1766,10 @@ function hideGridEdgeTooltip(e) {
     if (gridEdgeTooltip) {
         gridEdgeTooltip.style.display = 'none';
     }
-    // Restore edge style
-    e.target.setAttribute('stroke-opacity', '0.8');
-    e.target.setAttribute('stroke', '#ff6b6b');
+    // Restore edge style with original color
+    e.target.setAttribute('stroke-opacity', '0.5');
+    const originalColor = e.target.dataset.color || '#ff6b6b';
+    e.target.setAttribute('stroke', originalColor);
 }
 
 function moveGridEdgeTooltip(e) {
