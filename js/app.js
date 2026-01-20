@@ -186,37 +186,14 @@ sequenceBar.addEventListener('scroll', () => {
     isSyncing = false;
 });
 
-// Color scale for activation values (blue -> cyan -> green -> yellow -> red heatmap)
+// Color scale for activation values (light green #b8e994 to teal #079992)
 function getActivationColor(value, minVal, maxVal) {
     const t = Math.max(0, Math.min(1, (value - minVal) / (maxVal - minVal)));
 
-    // 5-stop heatmap: blue (0) -> cyan (0.25) -> green (0.5) -> yellow (0.75) -> red (1)
-    let r, g, b;
-    if (t < 0.25) {
-        // Blue to Cyan
-        const s = t / 0.25;
-        r = 0;
-        g = Math.round(255 * s);
-        b = 255;
-    } else if (t < 0.5) {
-        // Cyan to Green
-        const s = (t - 0.25) / 0.25;
-        r = 0;
-        g = 255;
-        b = Math.round(255 * (1 - s));
-    } else if (t < 0.75) {
-        // Green to Yellow
-        const s = (t - 0.5) / 0.25;
-        r = Math.round(255 * s);
-        g = 255;
-        b = 0;
-    } else {
-        // Yellow to Red
-        const s = (t - 0.75) / 0.25;
-        r = 255;
-        g = Math.round(255 * (1 - s));
-        b = 0;
-    }
+    // Light green to teal gradient
+    const r = Math.round(184 - t * 177);  // 184 to 7
+    const g = Math.round(233 - t * 80);   // 233 to 153
+    const b = Math.round(148 - t * 2);    // 148 to 146
     return `rgb(${r}, ${g}, ${b})`;
 }
 
@@ -289,8 +266,8 @@ function renderGrid() {
                     data-latent="${item.latentIdx}"
                     data-value="${item.value.toFixed(2)}"
                     style="background: ${color}; color: ${textColor}"
-                    title="L${item.latentIdx} (${item.value.toFixed(2)})"
-                >${item.latentIdx}</div>`;
+                    title="L${item.latentIdx + 1} (${item.value.toFixed(2)})"
+                >${item.latentIdx + 1}</div>`;
             }
             html += '</div>';
         }
@@ -315,7 +292,7 @@ function renderSequence() {
         const width = widths[i] || 36;
         html += `<div class="seq-item" data-pos="${i}" style="width: ${width}px; min-width: ${width}px;">
             <span class="seq-aa">${sequence[i]}</span>
-            <span class="seq-pos">${i}</span>
+            <span class="seq-pos">${i + 1}</span>
         </div>`;
     }
     sequenceContent.innerHTML = html;
@@ -342,13 +319,9 @@ function handleLatentClick(e) {
     const pos = parseInt(e.target.dataset.pos);
     const latentIdx = parseInt(e.target.dataset.latent);
     const value = parseFloat(e.target.dataset.value);
-    const aa = sequence[pos];
 
     // Show activation panel with wild type sequence and clicked position
     showActivationPanel(layer, latentIdx, pos, value);
-
-    // Also add to canvas (original behavior)
-    addNodeToCanvas(latentIdx, layer, pos, aa, value);
 }
 
 // Get activations for a specific latent across all positions in the wild type sequence
@@ -399,7 +372,7 @@ function renderWildTypeCard(layer, latentIdx, clickedPos, clickedValue) {
             <div class="clicked-position-info">
                 <div class="clicked-label">Current Position</div>
                 <div class="clicked-details">
-                    <span class="clicked-pos">Position ${clickedPos}</span>
+                    <span class="clicked-pos">Position ${clickedPos + 1}</span>
                     <span class="clicked-aa">${sequence[clickedPos]}</span>
                     <span class="clicked-activation">Activation: ${clickedValue.toFixed(3)}</span>
                 </div>
@@ -416,11 +389,29 @@ let currentPanelState = null;
 
 // Show the activation panel with wild type and top sequences for a latent
 function showActivationPanel(layer, latentIdx, clickedPos, clickedValue) {
-    // Store state for tab switching
-    currentPanelState = { layer, latentIdx, clickedPos, clickedValue };
+    // Store state for tab switching (include aa for add to canvas)
+    const aa = clickedPos !== null ? sequence[clickedPos] : null;
+    currentPanelState = { layer, latentIdx, clickedPos, clickedValue, aa };
 
     // Update panel title
-    panelTitle.textContent = `Layer ${layer} - Latent ${latentIdx}`;
+    panelTitle.textContent = `Layer ${layer + 1} - Latent ${latentIdx + 1}`;
+
+    // Add "Add to Canvas" button to header if not already present
+    const panelHeader = document.getElementById('activation-panel-header');
+    let addBtn = document.getElementById('panel-add-to-canvas');
+    if (!addBtn) {
+        addBtn = document.createElement('button');
+        addBtn.id = 'panel-add-to-canvas';
+        addBtn.className = 'btn-add-to-canvas';
+        addBtn.textContent = 'Add to Canvas';
+        addBtn.addEventListener('click', () => {
+            if (currentPanelState) {
+                const { layer, latentIdx, clickedPos, clickedValue, aa } = currentPanelState;
+                addNodeToCanvas(latentIdx, layer, clickedPos, aa, clickedValue);
+            }
+        });
+        panelHeader.insertBefore(addBtn, panelClose);
+    }
 
     // Render tabs and sequences view by default
     renderSequencesTab();
@@ -587,7 +578,7 @@ function renderAlignmentTab() {
     // Add toolbar with Go to Center button
     html += '<div class="alignment-toolbar">';
     html += `<button class="btn-go-to-center" data-center="${aligned.alignmentPosition}">Go to Center</button>`;
-    html += `<span class="alignment-info">Aligned at position ${aligned.alignmentPosition}</span>`;
+    html += `<span class="alignment-info">Aligned at position ${aligned.alignmentPosition + 1}</span>`;
     html += '</div>';
 
     // Render alignment view
@@ -646,14 +637,14 @@ function renderInfluencesTab() {
         <div class="influences-header">
             <div class="influences-summary">
                 <span class="influences-count">${incomingEdges.length} incoming connection${incomingEdges.length !== 1 ? 's' : ''}</span>
-                <span class="influences-target">to Layer ${layer}, Latent ${latentIdx}</span>
+                <span class="influences-target">to Layer ${layer + 1}, Latent ${latentIdx + 1}</span>
             </div>
         </div>
     `;
 
     if (incomingEdges.length === 0) {
         if (layer === 0) {
-            html += '<div class="no-data-message">Layer 0 latents have no incoming influences (they are the input layer).</div>';
+            html += '<div class="no-data-message">Layer 1 latents have no incoming influences (they are the input layer).</div>';
         } else if (!virtualWeightsData) {
             html += '<div class="no-data-message">Virtual weights data not loaded. Upload virtual_weights.json to see influences.</div>';
         } else {
@@ -677,8 +668,8 @@ function renderInfluencesTab() {
                      data-src-latent="${edge.srcLatent}">
                     <div class="influence-rank">#${index + 1}</div>
                     <div class="influence-source">
-                        <span class="influence-layer">Layer ${edge.srcLayer}</span>
-                        <span class="influence-latent">Latent ${edge.srcLatent}</span>
+                        <span class="influence-layer">Layer ${edge.srcLayer + 1}</span>
+                        <span class="influence-latent">Latent ${edge.srcLatent + 1}</span>
                     </div>
                     <div class="influence-weight ${weightSign}" style="background: ${weightColor}">
                         ${edge.avgWeight >= 0 ? '+' : ''}${edge.avgWeight.toFixed(4)}
@@ -775,7 +766,7 @@ function renderPositionRuler(totalLength, centerPosition) {
         const centerClass = isCenter ? ' center-line' : '';
 
         if (i % 10 === 0) {
-            html += `<span class="ruler-mark${centerClass}">${i}</span>`;
+            html += `<span class="ruler-mark${centerClass}">${i + 1}</span>`;
         } else if (i % 5 === 0) {
             html += `<span class="ruler-tick${centerClass}">|</span>`;
         } else {
@@ -887,13 +878,13 @@ function renderSequenceCard(item, rank) {
     `;
 }
 
-// Color scale for panel activation values (yellow to red gradient)
+// Color scale for panel activation values (light red to dark red gradient)
 function getActivationColorForPanel(value, minVal, maxVal) {
-    if (maxVal === minVal) return 'rgb(255, 200, 0)';
+    if (maxVal === minVal) return 'rgb(255, 211, 211)';
     const t = (value - minVal) / (maxVal - minVal);
     const r = 255;
-    const g = Math.round(200 * (1 - t));
-    const b = 0;
+    const g = Math.round(211 - t * 178);  // 211 to 33
+    const b = Math.round(211 - t * 178);  // 211 to 33
     return `rgb(${r}, ${g}, ${b})`;
 }
 
@@ -964,7 +955,7 @@ function showAATooltip(e) {
     const activation = target.dataset.activation;
 
     const tooltip = createTooltip();
-    tooltip.innerHTML = `<span class="tooltip-pos">Pos ${pos}</span><span class="tooltip-aa">${aa}</span><span class="tooltip-val">${activation}</span>`;
+    tooltip.innerHTML = `<span class="tooltip-pos">Pos ${parseInt(pos) + 1}</span><span class="tooltip-aa">${aa}</span><span class="tooltip-val">${activation}</span>`;
     tooltip.style.display = 'block';
 
     // Position tooltip near cursor
@@ -1014,7 +1005,7 @@ document.querySelectorAll('.layer-label').forEach((label, index) => {
 
 // Show layer panel with latent rankings for a specific layer
 function showLayerPanel(layer) {
-    layerPanelTitle.textContent = `Layer ${layer} - Latent Rankings`;
+    layerPanelTitle.textContent = `Layer ${layer + 1} - Latent Rankings`;
 
     // Collect all latents for this layer with their max activations
     const latentMaxActivations = [];
@@ -1089,12 +1080,12 @@ function renderLayerPanelContent(layer, latentMaxActivations) {
                 <div class="latent-rank-header">
                     <span class="latent-rank-number">#${index + 1}</span>
                     <div class="latent-rank-info">
-                        <span class="latent-rank-idx">Latent ${latentIdx}</span>
+                        <span class="latent-rank-idx">Latent ${latentIdx + 1}</span>
                         <span class="latent-rank-max">Max: ${maxVal.toFixed(3)}</span>
-                        <span class="latent-rank-pos">@ Pos ${maxPos} (${aa})</span>
+                        <span class="latent-rank-pos">@ Pos ${maxPos + 1} (${aa})</span>
                     </div>
                     <div class="latent-rank-actions">
-                        <button class="btn-add-supernode" title="Add supernode to canvas">Add Supernode</button>
+                        <button class="btn-add-to-canvas" title="Add node to canvas">Add to Canvas</button>
                         <button class="btn-feature-info" title="View feature information">Feature Info</button>
                     </div>
                 </div>
@@ -1123,11 +1114,23 @@ function renderLayerPanelContent(layer, latentMaxActivations) {
         });
     });
 
-    // Add click handlers for Add Supernode buttons (placeholder - no functionality yet)
-    layerPanelContent.querySelectorAll('.btn-add-supernode').forEach(btn => {
+    // Add click handlers for Add to Canvas buttons
+    layerPanelContent.querySelectorAll('.btn-add-to-canvas').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            // TODO: Implement add supernode functionality
+            const card = btn.closest('.latent-rank-card');
+            const cardLayer = parseInt(card.dataset.layer);
+            const latentIdx = parseInt(card.dataset.latent);
+            const pos = parseInt(card.dataset.pos);
+            const aa = sequence[pos];
+            const activations = getWildTypeActivations(cardLayer, latentIdx);
+            const value = activations[pos] || 0;
+
+            // Add node to canvas
+            addNodeToCanvas(latentIdx, cardLayer, pos, aa, value);
+
+            // Close the layer panel
+            layerPanel.classList.add('hidden');
         });
     });
 }
@@ -1171,7 +1174,8 @@ function addNodeToCanvas(latentIdx, layer, pos, aa, value, isSuper = false, chil
         aa,
         value,
         isSuper,
-        children
+        children,
+        name: ''
     };
 
     canvasNodes.push(node);
@@ -1267,14 +1271,15 @@ function renderNode(node) {
     div.style.top = node.y + 'px';
 
     if (node.isSuper) {
-        const latentIds = node.children.map(c => 'L' + c.latentIdx).join(', ');
+        const latentIds = node.children.map(c => 'L' + (c.latentIdx + 1)).join(', ');
         div.innerHTML = `
             <div class="node-latent">${latentIds}</div>
             <div class="node-info">Super Node (${node.children.length} items)</div>
         `;
     } else {
         div.innerHTML = `
-            <div class="node-latent">Layer ${node.layer} Latent ${node.latentIdx}</div>
+            <div class="node-latent">L${node.layer + 1}/${node.latentIdx + 1}</div>
+            ${node.name ? `<div class="node-name">${node.name}</div>` : ''}
         `;
     }
 
@@ -1776,6 +1781,12 @@ canvasResizeHandle.addEventListener('mousedown', startCanvasResize);
 
 // Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
+    // Ignore keyboard shortcuts when typing in an input field
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+        return;
+    }
+
     if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedNodes.size > 0 || selectedEdges.size > 0) {
             deleteSelected();
@@ -2019,8 +2030,8 @@ function createGridEdgeTooltip() {
 function showGridEdgeTooltip(e) {
     const tooltip = createGridEdgeTooltip();
     const weight = e.target.dataset.weight;
-    const srcInfo = `L${e.target.dataset.srcLayer}/P${e.target.dataset.srcPos}/F${e.target.dataset.srcFeature}`;
-    const tgtInfo = `L${e.target.dataset.tgtLayer}/P${e.target.dataset.tgtPos}/F${e.target.dataset.tgtFeature}`;
+    const srcInfo = `L${parseInt(e.target.dataset.srcLayer) + 1}/P${parseInt(e.target.dataset.srcPos) + 1}/F${parseInt(e.target.dataset.srcFeature) + 1}`;
+    const tgtInfo = `L${parseInt(e.target.dataset.tgtLayer) + 1}/P${parseInt(e.target.dataset.tgtPos) + 1}/F${parseInt(e.target.dataset.tgtFeature) + 1}`;
 
     tooltip.innerHTML = `
         <div class="edge-tooltip-weight">Weight: ${weight}</div>
@@ -2068,6 +2079,15 @@ let contextMenuTargetData = null;  // Data about the target element
 
 // Show context menu at given position
 function showContextMenu(x, y) {
+    // Show/hide menu items based on context type
+    const addToCanvasItem = contextMenu.querySelector('[data-action="add-to-canvas"]');
+    const addNameItem = contextMenu.querySelector('[data-action="add-name"]');
+
+    // "Add Node to Canvas" only for latent-box (grid items)
+    addToCanvasItem.style.display = contextMenuTargetType === 'latent-box' ? '' : 'none';
+    // "Add Name" only for canvas-node
+    addNameItem.style.display = contextMenuTargetType === 'canvas-node' ? '' : 'none';
+
     contextMenu.style.left = x + 'px';
     contextMenu.style.top = y + 'px';
     contextMenu.classList.remove('hidden');
@@ -2138,6 +2158,10 @@ contextMenu.addEventListener('click', (e) => {
         handleContextMenuDelete();
     } else if (action === 'show-info') {
         handleContextMenuShowInfo();
+    } else if (action === 'add-to-canvas') {
+        handleContextMenuAddToCanvas();
+    } else if (action === 'add-name') {
+        handleContextMenuAddName();
     }
 
     hideContextMenu();
@@ -2220,6 +2244,14 @@ function handleContextMenuShowInfo() {
     }
 }
 
+// Add to canvas action handler
+function handleContextMenuAddToCanvas() {
+    if (contextMenuTargetType === 'latent-box' && contextMenuTargetData) {
+        const { layer, pos, latentIdx, value, aa } = contextMenuTargetData;
+        addNodeToCanvas(latentIdx, layer, pos, aa, value);
+    }
+}
+
 // Close context menu when clicking outside
 document.addEventListener('click', (e) => {
     if (!contextMenu.contains(e.target)) {
@@ -2235,3 +2267,57 @@ document.addEventListener('keydown', (e) => {
         e.stopPropagation();
     }
 }, true);  // Use capture phase to handle before other handlers
+
+// ============================================
+// Name Popup Functionality
+// ============================================
+
+let namePopupTargetNode = null;
+
+function showNamePopup(node) {
+    namePopupTargetNode = node;
+    const popup = document.getElementById('name-popup');
+    const input = document.getElementById('node-name-input');
+    input.value = node.name || '';
+    popup.classList.remove('hidden');
+    input.focus();
+}
+
+function hideNamePopup() {
+    const popup = document.getElementById('name-popup');
+    popup.classList.add('hidden');
+    namePopupTargetNode = null;
+}
+
+function handleContextMenuAddName() {
+    if (contextMenuTargetType === 'canvas-node' && contextMenuTargetData) {
+        showNamePopup(contextMenuTargetData);
+    }
+}
+
+// Name popup event listeners
+document.getElementById('name-popup-cancel').addEventListener('click', hideNamePopup);
+
+document.getElementById('name-popup-save').addEventListener('click', () => {
+    if (namePopupTargetNode) {
+        const input = document.getElementById('node-name-input');
+        namePopupTargetNode.name = input.value.trim();
+
+        // Re-render the node
+        const nodeEl = nodesContainer.querySelector(`[data-id="${namePopupTargetNode.id}"]`);
+        if (nodeEl) {
+            nodeEl.remove();
+            renderNode(namePopupTargetNode);
+        }
+    }
+    hideNamePopup();
+});
+
+// Keyboard shortcuts for name popup
+document.getElementById('node-name-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        document.getElementById('name-popup-save').click();
+    } else if (e.key === 'Escape') {
+        hideNamePopup();
+    }
+});

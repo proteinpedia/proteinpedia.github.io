@@ -73,12 +73,12 @@
         <!-- Grid Section -->
         <div id="grid-container">
             <div id="layer-labels">
+                <div class="layer-label">Layer 6</div>
                 <div class="layer-label">Layer 5</div>
                 <div class="layer-label">Layer 4</div>
                 <div class="layer-label">Layer 3</div>
                 <div class="layer-label">Layer 2</div>
                 <div class="layer-label">Layer 1</div>
-                <div class="layer-label">Layer 0</div>
             </div>
             <div id="grid-body"></div>
             <svg id="grid-edges-svg"></svg>
@@ -111,8 +111,22 @@
 
     <!-- Context Menu -->
     <div id="context-menu" class="context-menu hidden">
+        <div class="context-menu-item" data-action="add-to-canvas">Add Node to Canvas</div>
+        <div class="context-menu-item" data-action="add-name">Add Name</div>
         <div class="context-menu-item" data-action="delete">Delete</div>
         <div class="context-menu-item" data-action="show-info">Show Latent Information</div>
+    </div>
+
+    <!-- Name Input Popup -->
+    <div id="name-popup" class="name-popup hidden">
+        <div class="name-popup-content">
+            <h3>Add Node Name</h3>
+            <input type="text" id="node-name-input" placeholder="Enter name...">
+            <div class="name-popup-buttons">
+                <button id="name-popup-cancel">Cancel</button>
+                <button id="name-popup-save">Save</button>
+            </div>
+        </div>
     </div>
 
     <script src="js/app.js"></script>

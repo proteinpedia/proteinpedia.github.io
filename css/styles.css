@@ -168,13 +168,7 @@ body {
     width: 200px;
     height: 16px;
     border-radius: 3px;
-    background: linear-gradient(to right,
-        rgb(0, 0, 255) 0%,
-        rgb(0, 255, 255) 25%,
-        rgb(0, 255, 0) 50%,
-        rgb(255, 255, 0) 75%,
-        rgb(255, 0, 0) 100%
-    );
+    background: linear-gradient(to right, #b8e994 0%, #079992 100%);
     border: 1px solid #444;
 }
 
@@ -596,6 +590,25 @@ body.resizing-canvas {
     font-size: 18px;
     color: #00d9ff;
     margin: 0;
+}
+
+#panel-add-to-canvas {
+    padding: 8px 16px;
+    background: #533483;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-left: auto;
+    margin-right: 12px;
+    transition: background 0.2s, transform 0.1s;
+}
+
+#panel-add-to-canvas:hover {
+    background: #6b44a8;
+    transform: scale(1.05);
 }
 
 #panel-close {
@@ -1332,12 +1345,12 @@ body.resizing-canvas {
     transition: background 0.2s, transform 0.1s;
 }
 
-.btn-add-supernode {
+.btn-add-to-canvas {
     background: #533483;
     color: #fff;
 }
 
-.btn-add-supernode:hover {
+.btn-add-to-canvas:hover {
     background: #6b44a8;
     transform: scale(1.05);
 }
@@ -1620,4 +1633,98 @@ body.resizing-canvas {
 
 .context-menu-item:last-child {
     border-radius: 0 0 4px 4px;
+}
+
+/* ============================================
+   Node Name Styles
+   ============================================ */
+
+.node-name {
+    font-size: 11px;
+    color: #a0a0c0;
+    margin-top: 2px;
+}
+
+/* ============================================
+   Name Popup Styles
+   ============================================ */
+
+.name-popup {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10001;
+}
+
+.name-popup.hidden {
+    display: none;
+}
+
+.name-popup-content {
+    background: #1a1a2e;
+    border: 1px solid #4a4a6a;
+    border-radius: 8px;
+    padding: 20px;
+    min-width: 300px;
+}
+
+.name-popup-content h3 {
+    margin: 0 0 15px 0;
+    color: #00d9ff;
+}
+
+#node-name-input {
+    width: 100%;
+    padding: 8px;
+    background: #2a2a4e;
+    border: 1px solid #4a4a6a;
+    border-radius: 4px;
+    color: #e0e0e0;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+#node-name-input:focus {
+    outline: none;
+    border-color: #00d9ff;
+}
+
+.name-popup-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 15px;
+}
+
+.name-popup-buttons button {
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+#name-popup-cancel {
+    background: #4a4a6a;
+    border: none;
+    color: #e0e0e0;
+}
+
+#name-popup-cancel:hover {
+    background: #5a5a7a;
+}
+
+#name-popup-save {
+    background: #00d9ff;
+    border: none;
+    color: #1a1a2e;
+}
+
+#name-popup-save:hover {
+    background: #33e0ff;
 }
