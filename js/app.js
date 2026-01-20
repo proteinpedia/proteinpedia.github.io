@@ -2056,3 +2056,182 @@ function moveGridEdgeTooltip(e) {
         gridEdgeTooltip.style.top = y + 'px';
     }
 }
+
+// ============================================
+// Context Menu for Latent Elements
+// ============================================
+
+const contextMenu = document.getElementById('context-menu');
+let contextMenuTarget = null;  // The element that was right-clicked
+let contextMenuTargetType = null;  // 'canvas-node' or 'latent-box'
+let contextMenuTargetData = null;  // Data about the target element
+
+// Show context menu at given position
+function showContextMenu(x, y) {
+    contextMenu.style.left = x + 'px';
+    contextMenu.style.top = y + 'px';
+    contextMenu.classList.remove('hidden');
+
+    // Ensure menu stays within viewport
+    const rect = contextMenu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+        contextMenu.style.left = (window.innerWidth - rect.width - 10) + 'px';
+    }
+    if (rect.bottom > window.innerHeight) {
+        contextMenu.style.top = (window.innerHeight - rect.height - 10) + 'px';
+    }
+}
+
+// Hide context menu
+function hideContextMenu() {
+    contextMenu.classList.add('hidden');
+    contextMenuTarget = null;
+    contextMenuTargetType = null;
+    contextMenuTargetData = null;
+}
+
+// Handle right-click on canvas nodes
+nodesContainer.addEventListener('contextmenu', (e) => {
+    const nodeEl = e.target.closest('.canvas-node');
+    if (!nodeEl) return;
+
+    e.preventDefault();
+
+    const nodeId = parseInt(nodeEl.dataset.id);
+    const node = canvasNodes.find(n => n.id === nodeId);
+
+    if (node) {
+        contextMenuTarget = nodeEl;
+        contextMenuTargetType = 'canvas-node';
+        contextMenuTargetData = node;
+        showContextMenu(e.clientX, e.clientY);
+    }
+});
+
+// Handle right-click on latent boxes in grid
+gridBody.addEventListener('contextmenu', (e) => {
+    const latentBox = e.target.closest('.latent-box');
+    if (!latentBox) return;
+
+    e.preventDefault();
+
+    const layer = parseInt(latentBox.dataset.layer);
+    const pos = parseInt(latentBox.dataset.pos);
+    const latentIdx = parseInt(latentBox.dataset.latent);
+    const value = parseFloat(latentBox.dataset.value);
+    const aa = sequence[pos];
+
+    contextMenuTarget = latentBox;
+    contextMenuTargetType = 'latent-box';
+    contextMenuTargetData = { layer, pos, latentIdx, value, aa };
+    showContextMenu(e.clientX, e.clientY);
+});
+
+// Handle context menu item clicks
+contextMenu.addEventListener('click', (e) => {
+    const item = e.target.closest('.context-menu-item');
+    if (!item) return;
+
+    const action = item.dataset.action;
+
+    if (action === 'delete') {
+        handleContextMenuDelete();
+    } else if (action === 'show-info') {
+        handleContextMenuShowInfo();
+    }
+
+    hideContextMenu();
+});
+
+// Delete action handler
+function handleContextMenuDelete() {
+    if (contextMenuTargetType === 'canvas-node' && contextMenuTargetData) {
+        // Delete the canvas node
+        const nodeId = contextMenuTargetData.id;
+
+        // Remove edges connected to this node
+        edges = edges.filter(e => e.from !== nodeId && e.to !== nodeId);
+
+        // Remove node from array
+        const idx = canvasNodes.findIndex(n => n.id === nodeId);
+        if (idx !== -1) canvasNodes.splice(idx, 1);
+
+        // Remove DOM element
+        if (contextMenuTarget) contextMenuTarget.remove();
+
+        // Clear selection if this node was selected
+        selectedNodes.delete(nodeId);
+
+        // Update edges display
+        updateEdges();
+        updateSelectionUI();
+
+    } else if (contextMenuTargetType === 'latent-box' && contextMenuTargetData) {
+        // Find and delete the corresponding canvas node if it exists
+        const { layer, latentIdx } = contextMenuTargetData;
+        const node = findCanvasNode(layer, latentIdx);
+
+        if (node) {
+            const nodeId = node.id;
+
+            // Remove edges connected to this node
+            edges = edges.filter(e => e.from !== nodeId && e.to !== nodeId);
+
+            // Remove node from array
+            const idx = canvasNodes.findIndex(n => n.id === nodeId);
+            if (idx !== -1) canvasNodes.splice(idx, 1);
+
+            // Remove DOM element
+            const nodeEl = nodesContainer.querySelector(`[data-id="${nodeId}"]`);
+            if (nodeEl) nodeEl.remove();
+
+            // Clear selection if this node was selected
+            selectedNodes.delete(nodeId);
+
+            // Update edges display
+            updateEdges();
+            updateSelectionUI();
+        }
+    }
+}
+
+// Show latent information action handler
+function handleContextMenuShowInfo() {
+    if (contextMenuTargetType === 'canvas-node' && contextMenuTargetData) {
+        const node = contextMenuTargetData;
+
+        if (node.isSuper) {
+            // For super nodes, show info for the first child
+            if (node.children && node.children.length > 0) {
+                const child = node.children[0];
+                const activations = getWildTypeActivations(child.layer, child.latentIdx);
+                const maxIdx = findMaxActivationIndex(activations);
+                const maxValue = activations[maxIdx] || 0;
+                showActivationPanel(child.layer, child.latentIdx, maxIdx, maxValue);
+            }
+        } else {
+            // For regular nodes, show activation panel
+            showActivationPanel(node.layer, node.latentIdx, node.pos, node.value);
+        }
+
+    } else if (contextMenuTargetType === 'latent-box' && contextMenuTargetData) {
+        const { layer, latentIdx, pos, value } = contextMenuTargetData;
+        showActivationPanel(layer, latentIdx, pos, value);
+    }
+}
+
+// Close context menu when clicking outside
+document.addEventListener('click', (e) => {
+    if (!contextMenu.contains(e.target)) {
+        hideContextMenu();
+    }
+});
+
+// Close context menu on Escape key (extend existing handler)
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !contextMenu.classList.contains('hidden')) {
+        hideContextMenu();
+        e.preventDefault();
+        e.stopPropagation();
+    }
+}, true);  // Use capture phase to handle before other handlers

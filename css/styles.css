@@ -1584,3 +1584,40 @@ body.resizing-canvas {
     background: #1a5080;
     transform: scale(1.05);
 }
+
+/* ============================================
+   Context Menu Styles
+   ============================================ */
+
+.context-menu {
+    position: fixed;
+    background: #1a1a2e;
+    border: 1px solid #4a4a6a;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    z-index: 10000;
+    min-width: 180px;
+}
+
+.context-menu.hidden {
+    display: none;
+}
+
+.context-menu-item {
+    padding: 8px 16px;
+    cursor: pointer;
+    color: #e0e0e0;
+    font-size: 14px;
+}
+
+.context-menu-item:hover {
+    background: #2a2a4e;
+}
+
+.context-menu-item:first-child {
+    border-radius: 4px 4px 0 0;
+}
+
+.context-menu-item:last-child {
+    border-radius: 0 0 4px 4px;
+}
