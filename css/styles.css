@@ -1400,3 +1400,127 @@ body {
     font-weight: bold;
     color: #00d9ff;
 }
+
+/* ============================================
+   Influences Tab Styles
+   ============================================ */
+
+.influences-header {
+    padding: 16px;
+    background: #16213e;
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+.influences-summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.influences-count {
+    font-size: 18px;
+    font-weight: bold;
+    color: #00d9ff;
+}
+
+.influences-target {
+    font-size: 14px;
+    color: #888;
+}
+
+.influences-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.influence-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+    background: #16213e;
+    border-radius: 8px;
+    border: 1px solid #333;
+    transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+
+.influence-card:hover {
+    border-color: #00d9ff;
+    transform: translateX(4px);
+    box-shadow: 0 0 12px rgba(0, 217, 255, 0.2);
+}
+
+.influence-rank {
+    font-size: 14px;
+    font-weight: bold;
+    color: #666;
+    min-width: 30px;
+}
+
+.influence-source {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 120px;
+}
+
+.influence-layer {
+    font-size: 12px;
+    color: #888;
+}
+
+.influence-latent {
+    font-size: 16px;
+    font-weight: bold;
+    color: #00d9ff;
+}
+
+.influence-weight {
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    font-weight: bold;
+    min-width: 90px;
+    text-align: center;
+}
+
+.influence-weight.positive {
+    color: #000;
+}
+
+.influence-weight.negative {
+    color: #fff;
+}
+
+.influence-meta {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+    gap: 16px;
+}
+
+.influence-edge-count {
+    font-size: 11px;
+    color: #666;
+    font-style: italic;
+}
+
+.btn-view-source {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    background: #0f3460;
+    color: #00d9ff;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.btn-view-source:hover {
+    background: #1a5080;
+    transform: scale(1.05);
+}

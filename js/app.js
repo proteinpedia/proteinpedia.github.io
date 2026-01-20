@@ -471,6 +471,7 @@ function renderTabs(activeTab) {
         <div class="panel-tabs">
             <button class="panel-tab ${activeTab === 'sequences' ? 'active' : ''}" data-tab="sequences">Sequences</button>
             <button class="panel-tab ${activeTab === 'alignment' ? 'active' : ''}" data-tab="alignment">Alignment</button>
+            <button class="panel-tab ${activeTab === 'influences' ? 'active' : ''}" data-tab="influences">Influences</button>
         </div>
     `;
 }
@@ -484,9 +485,54 @@ function attachTabListeners() {
                 renderSequencesTab();
             } else if (tabName === 'alignment') {
                 renderAlignmentTab();
+            } else if (tabName === 'influences') {
+                renderInfluencesTab();
             }
         });
     });
+}
+
+// Get incoming edges (influences) for a specific latent
+// Returns array of { srcLayer, srcLatent, avgWeight, count } sorted by absolute weight
+function getIncomingEdges(tgtLayer, tgtLatent) {
+    const incoming = [];
+
+    if (!virtualWeightsData || aggregatedVirtualWeights.size === 0) {
+        return incoming;
+    }
+
+    // Iterate through aggregated weights to find edges targeting this latent
+    for (const [key, data] of aggregatedVirtualWeights.entries()) {
+        // Key format: "layer1-latent1:layer2-latent2" (canonical: smaller first)
+        const [part1, part2] = key.split(':');
+        const [layer1, latent1] = part1.split('-').map(Number);
+        const [layer2, latent2] = part2.split('-').map(Number);
+
+        // Check if this edge points TO our target latent from a lower layer
+        // Case 1: part2 is the target (layer2-latent2 matches)
+        if (layer2 === tgtLayer && latent2 === tgtLatent && layer1 < tgtLayer) {
+            incoming.push({
+                srcLayer: layer1,
+                srcLatent: latent1,
+                avgWeight: data.avgWeight,
+                count: data.count
+            });
+        }
+        // Case 2: part1 is the target (layer1-latent1 matches)
+        else if (layer1 === tgtLayer && latent1 === tgtLatent && layer2 < tgtLayer) {
+            incoming.push({
+                srcLayer: layer2,
+                srcLatent: latent2,
+                avgWeight: data.avgWeight,
+                count: data.count
+            });
+        }
+    }
+
+    // Sort by absolute weight strength (strongest first)
+    incoming.sort((a, b) => Math.abs(b.avgWeight) - Math.abs(a.avgWeight));
+
+    return incoming;
 }
 
 // Render the Alignment tab content
@@ -583,6 +629,96 @@ function scrollToAlignmentCenter() {
         // Scroll so the center line is in the middle of the view
         scrollContainer.scrollLeft = markerOffset - (containerWidth / 2) + 10;
     }
+}
+
+// Render the Influences tab content
+function renderInfluencesTab() {
+    const { layer, latentIdx } = currentPanelState;
+
+    // Add tabs
+    let html = renderTabs('influences');
+
+    // Get incoming edges for this latent
+    const incomingEdges = getIncomingEdges(layer, latentIdx);
+
+    // Header info
+    html += `
+        <div class="influences-header">
+            <div class="influences-summary">
+                <span class="influences-count">${incomingEdges.length} incoming connection${incomingEdges.length !== 1 ? 's' : ''}</span>
+                <span class="influences-target">to Layer ${layer}, Latent ${latentIdx}</span>
+            </div>
+        </div>
+    `;
+
+    if (incomingEdges.length === 0) {
+        if (layer === 0) {
+            html += '<div class="no-data-message">Layer 0 latents have no incoming influences (they are the input layer).</div>';
+        } else if (!virtualWeightsData) {
+            html += '<div class="no-data-message">Virtual weights data not loaded. Upload virtual_weights.json to see influences.</div>';
+        } else {
+            html += '<div class="no-data-message">No incoming influences found for this latent.</div>';
+        }
+    } else {
+        // Calculate min/max for color scaling
+        const weights = incomingEdges.map(e => e.avgWeight);
+        const minWeight = Math.min(...weights);
+        const maxWeight = Math.max(...weights);
+
+        html += '<div class="influences-list">';
+
+        incomingEdges.forEach((edge, index) => {
+            const weightSign = edge.avgWeight >= 0 ? 'positive' : 'negative';
+            const weightColor = getEdgeColor(edge.avgWeight, minWeight, maxWeight);
+
+            html += `
+                <div class="influence-card"
+                     data-src-layer="${edge.srcLayer}"
+                     data-src-latent="${edge.srcLatent}">
+                    <div class="influence-rank">#${index + 1}</div>
+                    <div class="influence-source">
+                        <span class="influence-layer">Layer ${edge.srcLayer}</span>
+                        <span class="influence-latent">Latent ${edge.srcLatent}</span>
+                    </div>
+                    <div class="influence-weight ${weightSign}" style="background: ${weightColor}">
+                        ${edge.avgWeight >= 0 ? '+' : ''}${edge.avgWeight.toFixed(4)}
+                    </div>
+                    <div class="influence-meta">
+                        <span class="influence-edge-count">${edge.count} edge${edge.count !== 1 ? 's' : ''}</span>
+                    </div>
+                    <button class="btn-view-source" title="View source latent">View</button>
+                </div>
+            `;
+        });
+
+        html += '</div>';
+    }
+
+    panelContent.innerHTML = html;
+    attachTabListeners();
+    attachInfluenceListeners();
+}
+
+// Attach click listeners for influence cards
+function attachInfluenceListeners() {
+    panelContent.querySelectorAll('.influence-card').forEach(card => {
+        const viewBtn = card.querySelector('.btn-view-source');
+        if (viewBtn) {
+            viewBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const srcLayer = parseInt(card.dataset.srcLayer);
+                const srcLatent = parseInt(card.dataset.srcLatent);
+
+                // Get activations for the source latent
+                const activations = getWildTypeActivations(srcLayer, srcLatent);
+                const maxIdx = findMaxActivationIndex(activations);
+                const maxValue = activations[maxIdx] || 0;
+
+                // Navigate to that latent's panel
+                showActivationPanel(srcLayer, srcLatent, maxIdx, maxValue);
+            });
+        }
+    });
 }
 
 // Find the index of max activation in an array
