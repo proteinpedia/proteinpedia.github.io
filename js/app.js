@@ -125,6 +125,19 @@ btnLoad.addEventListener('click', async () => {
             if (btnVirtualWeights) {
                 btnVirtualWeights.disabled = false;
             }
+            // Set default threshold to cap at 1000 edges max
+            const maxEdges = 1000;
+            const totalEdges = virtualWeightsData.length;
+            if (totalEdges > maxEdges) {
+                virtualWeightsThreshold = (maxEdges / totalEdges * 100);
+            } else {
+                virtualWeightsThreshold = 100;
+            }
+            // Update slider and input to reflect the calculated default
+            const edgeSlider = document.getElementById('edge-threshold-slider');
+            const edgeInput = document.getElementById('edge-threshold-input');
+            if (edgeSlider) edgeSlider.value = virtualWeightsThreshold;
+            if (edgeInput) edgeInput.value = virtualWeightsThreshold;
         }
 
         // Index by layer and position
@@ -1835,7 +1848,7 @@ btnVirtualWeights.addEventListener('click', () => {
 
 // Edge threshold slider handler
 edgeThresholdSlider.addEventListener('input', () => {
-    virtualWeightsThreshold = parseInt(edgeThresholdSlider.value);
+    virtualWeightsThreshold = parseFloat(edgeThresholdSlider.value);
     edgeThresholdInput.value = virtualWeightsThreshold;
     if (virtualWeightsVisible) {
         renderVirtualWeightsInGrid();
@@ -1844,8 +1857,8 @@ edgeThresholdSlider.addEventListener('input', () => {
 
 // Edge threshold input handler
 edgeThresholdInput.addEventListener('input', () => {
-    let value = parseInt(edgeThresholdInput.value) || 1;
-    value = Math.max(1, Math.min(100, value));
+    let value = parseFloat(edgeThresholdInput.value) || 0.01;
+    value = Math.max(0.01, Math.min(100, value));
     virtualWeightsThreshold = value;
     edgeThresholdSlider.value = value;
     if (virtualWeightsVisible) {
@@ -1855,8 +1868,8 @@ edgeThresholdInput.addEventListener('input', () => {
 
 // Clamp value on blur
 edgeThresholdInput.addEventListener('blur', () => {
-    let value = parseInt(edgeThresholdInput.value) || 1;
-    value = Math.max(1, Math.min(100, value));
+    let value = parseFloat(edgeThresholdInput.value) || 0.01;
+    value = Math.max(0.01, Math.min(100, value));
     edgeThresholdInput.value = value;
     virtualWeightsThreshold = value;
     edgeThresholdSlider.value = value;
