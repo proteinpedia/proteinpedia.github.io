@@ -1268,34 +1268,43 @@ function getActivationColorForPanel(value, minVal, maxVal) {
 
 // Color scale for edge weights (blue for negative, red for positive)
 function getEdgeColor(weight, minWeight, maxWeight) {
+    // Color definitions
+    // Negative: #82ccdd (light blue) -> #3c6382 (dark blue)
+    const negLow = { r: 130, g: 204, b: 221 };  // #82ccdd
+    const negHigh = { r: 60, g: 99, b: 130 };   // #3c6382
+    // Positive: #f8c291 (light orange) -> #eb2f06 (red)
+    const posLow = { r: 248, g: 194, b: 145 };  // #f8c291
+    const posHigh = { r: 235, g: 47, b: 6 };    // #eb2f06
+
     // Handle edge case where all weights are the same
     if (maxWeight === minWeight) {
-        return weight >= 0 ? 'rgb(255, 100, 100)' : 'rgb(100, 100, 255)';
+        if (weight >= 0) {
+            // Midpoint of positive range
+            return `rgb(${Math.round((posLow.r + posHigh.r) / 2)}, ${Math.round((posLow.g + posHigh.g) / 2)}, ${Math.round((posLow.b + posHigh.b) / 2)})`;
+        } else {
+            // Midpoint of negative range
+            return `rgb(${Math.round((negLow.r + negHigh.r) / 2)}, ${Math.round((negLow.g + negHigh.g) / 2)}, ${Math.round((negLow.b + negHigh.b) / 2)})`;
+        }
     }
 
     // Normalize weight to [-1, 1] range based on the maximum absolute value
     const maxAbs = Math.max(Math.abs(minWeight), Math.abs(maxWeight));
     const normalized = maxAbs === 0 ? 0 : weight / maxAbs;
 
-    // Create a diverging color scale: blue (-1) -> white (0) -> red (+1)
+    // Interpolate between colors based on magnitude
     let r, g, b;
+    const t = Math.abs(normalized); // magnitude from 0 to 1
 
     if (normalized < 0) {
-        // Negative: white to blue
-        // At -1: rgb(0, 100, 255) - strong blue
-        // At 0: rgb(255, 255, 255) - white
-        const t = Math.abs(normalized);
-        r = Math.round(255 * (1 - t));
-        g = Math.round(255 * (1 - t * 0.6));
-        b = 255;
+        // Negative: light blue (#82ccdd) -> dark blue (#3c6382)
+        r = Math.round(negLow.r + t * (negHigh.r - negLow.r));
+        g = Math.round(negLow.g + t * (negHigh.g - negLow.g));
+        b = Math.round(negLow.b + t * (negHigh.b - negLow.b));
     } else {
-        // Positive: white to red
-        // At 0: rgb(255, 255, 255) - white
-        // At +1: rgb(255, 50, 50) - strong red
-        const t = normalized;
-        r = 255;
-        g = Math.round(255 * (1 - t * 0.8));
-        b = Math.round(255 * (1 - t * 0.8));
+        // Positive: light orange (#f8c291) -> red (#eb2f06)
+        r = Math.round(posLow.r + t * (posHigh.r - posLow.r));
+        g = Math.round(posLow.g + t * (posHigh.g - posLow.g));
+        b = Math.round(posLow.b + t * (posHigh.b - posLow.b));
     }
 
     return `rgb(${r}, ${g}, ${b})`;
