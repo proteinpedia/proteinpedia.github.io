@@ -34,6 +34,217 @@ const statusTop = document.getElementById('status-top');
 const statusVirtual = document.getElementById('status-virtual');
 const appContainer = document.getElementById('app');
 
+// Example selector elements
+const exampleDropdown = document.getElementById('example-dropdown');
+const btnLoadCustom = document.getElementById('btn-load-custom');
+let examplesData = [];  // Store loaded examples
+
+// Load examples from CSV on page load
+async function loadExamplesCSV() {
+    try {
+        const response = await fetch('examples/examples.csv');
+        const csvText = await response.text();
+        const lines = csvText.trim().split('\n');
+
+        // Skip header row
+        const examples = [];
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+
+            // Parse CSV line (handle quoted values)
+            const match = line.match(/(\d+),\s*"([^"]+)",\s*"([^"]+)"/);
+            if (match) {
+                examples.push({
+                    id: match[1],
+                    name: match[2],
+                    path: match[3]
+                });
+            }
+        }
+
+        // Fetch sequence for each example to build the dropdown label
+        for (const example of examples) {
+            try {
+                const seqResponse = await fetch(example.path + 'seq.txt');
+                const seqText = await seqResponse.text();
+                example.sequence = seqText.trim();
+            } catch (err) {
+                example.sequence = '';
+            }
+        }
+
+        examplesData = examples;
+        populateExampleDropdown(examples);
+
+        // Auto-load first example
+        if (examples.length > 0) {
+            exampleDropdown.value = examples[0].path;
+            await loadExampleData(examples[0].path);
+        }
+    } catch (err) {
+        console.error('Error loading examples CSV:', err);
+        exampleDropdown.innerHTML = '<option value="">No examples available</option>';
+    }
+}
+
+// Populate dropdown with examples
+function populateExampleDropdown(examples) {
+    exampleDropdown.innerHTML = '<option value="">Select an example circuit...</option>';
+
+    for (const example of examples) {
+        const option = document.createElement('option');
+        option.value = example.path;
+
+        // Format: [Circuit name] - [Sequence (max 15 chars)]...
+        let seqDisplay = example.sequence || '';
+        if (seqDisplay.length > 15) {
+            seqDisplay = seqDisplay.substring(0, 15) + '...';
+        }
+        option.textContent = `${example.name} - ${seqDisplay}`;
+
+        exampleDropdown.appendChild(option);
+    }
+}
+
+// Load example data from path
+async function loadExampleData(path) {
+    try {
+        // Reset state
+        resetAppState();
+
+        // Fetch all required files
+        const [activationsText, seqText, topActivationsText, virtualWeightsText] = await Promise.all([
+            fetch(path + 'activation_indices.json').then(r => r.text()),
+            fetch(path + 'seq.txt').then(r => r.text()),
+            fetch(path + 'top_activations.json').then(r => r.text()),
+            fetch(path + 'virtual_weights.json').then(r => r.ok ? r.text() : null).catch(() => null)
+        ]);
+
+        const activations = JSON.parse(activationsText);
+        sequence = seqText.trim();
+        topActivationsData = JSON.parse(topActivationsText);
+
+        // Parse virtual weights if present
+        if (virtualWeightsText) {
+            virtualWeightsData = JSON.parse(virtualWeightsText);
+            preprocessVirtualWeights();
+            const btnVirtualWeights = document.getElementById('btn-virtual-weights');
+            if (btnVirtualWeights) {
+                btnVirtualWeights.disabled = false;
+            }
+            // Set default threshold to cap at 1000 edges max
+            const maxEdges = 1000;
+            const totalEdges = virtualWeightsData.length;
+            if (totalEdges > maxEdges) {
+                virtualWeightsThreshold = (maxEdges / totalEdges * 100);
+            } else {
+                virtualWeightsThreshold = 100;
+            }
+            const edgeSlider = document.getElementById('edge-threshold-slider');
+            const edgeInput = document.getElementById('edge-threshold-input');
+            if (edgeSlider) edgeSlider.value = virtualWeightsThreshold;
+            if (edgeInput) edgeInput.value = virtualWeightsThreshold;
+        } else {
+            virtualWeightsData = null;
+            const btnVirtualWeights = document.getElementById('btn-virtual-weights');
+            if (btnVirtualWeights) {
+                btnVirtualWeights.disabled = true;
+            }
+        }
+
+        // Index by layer and position
+        for (const [layer, pos, value, latentIdx] of activations) {
+            if (!activationData[layer]) activationData[layer] = {};
+            if (!activationData[layer][pos]) activationData[layer][pos] = [];
+            activationData[layer][pos].push({ value, latentIdx });
+        }
+
+        // Render the visualization
+        renderGrid();
+        renderSequence();
+        updateLegend();
+
+    } catch (err) {
+        console.error('Error loading example data:', err);
+        alert('Error loading example. Please try another or load a custom circuit.');
+    }
+}
+
+// Reset app state for fresh data load
+function resetAppState() {
+    activationData = {};
+    topActivationsData = null;
+    virtualWeightsData = null;
+    sequence = '';
+    canvasNodes = [];
+    edges = [];
+    selectedNodes.clear();
+    selectedEdges.clear();
+    nodeIdCounter = 0;
+    edgeIdCounter = 0;
+    virtualWeightsVisible = false;
+    virtualWeightsEdges = [];
+    aggregatedVirtualWeights.clear();
+
+    // Clear canvas
+    const nodesContainer = document.getElementById('nodes-container');
+    const edgesSvg = document.getElementById('edges-svg');
+    if (nodesContainer) nodesContainer.innerHTML = '';
+    if (edgesSvg) edgesSvg.innerHTML = '';
+
+    // Reset virtual weights button state
+    const btnVirtualWeights = document.getElementById('btn-virtual-weights');
+    if (btnVirtualWeights) {
+        btnVirtualWeights.classList.remove('active');
+    }
+
+    // Hide edge filter control
+    const edgeFilterControl = document.getElementById('edge-filter-control');
+    if (edgeFilterControl) {
+        edgeFilterControl.classList.add('hidden');
+    }
+}
+
+// Handle dropdown change
+exampleDropdown.addEventListener('change', async (e) => {
+    const path = e.target.value;
+    if (path) {
+        await loadExampleData(path);
+    }
+});
+
+// Handle "Load Custom Circuit" button
+btnLoadCustom.addEventListener('click', () => {
+    // Reset file upload state
+    uploadedFiles = {
+        activationIndices: null,
+        seq: null,
+        topActivations: null,
+        virtualWeights: null
+    };
+
+    // Reset status indicators
+    statusActivation.classList.remove('loaded');
+    statusActivation.querySelector('.status-icon').textContent = '○';
+    statusSeq.classList.remove('loaded');
+    statusSeq.querySelector('.status-icon').textContent = '○';
+    statusTop.classList.remove('loaded');
+    statusTop.querySelector('.status-icon').textContent = '○';
+    statusVirtual.classList.remove('loaded');
+    statusVirtual.querySelector('.status-icon').textContent = '○';
+
+    // Reset button
+    btnLoad.textContent = 'Load Data';
+    btnLoad.disabled = true;
+
+    // Show upload screen
+    uploadScreen.classList.remove('hidden');
+});
+
+// Initialize examples on page load
+loadExamplesCSV();
+
 // File upload handlers
 dropzone.addEventListener('click', () => fileInput.click());
 
@@ -96,6 +307,12 @@ btnLoad.addEventListener('click', async () => {
         btnLoad.textContent = 'Loading...';
         btnLoad.disabled = true;
 
+        // Reset app state for fresh load
+        resetAppState();
+
+        // Clear dropdown selection (custom circuit)
+        exampleDropdown.value = '';
+
         // Read all required files
         const filePromises = [
             uploadedFiles.activationIndices.text(),
@@ -147,9 +364,8 @@ btnLoad.addEventListener('click', async () => {
             activationData[layer][pos].push({ value, latentIdx });
         }
 
-        // Hide upload screen, show app
+        // Hide upload screen
         uploadScreen.classList.add('hidden');
-        appContainer.classList.remove('hidden');
 
         // Render the visualization
         renderGrid();
@@ -170,8 +386,6 @@ const sequenceBar = document.getElementById('sequence-bar');
 const sequenceContent = document.getElementById('sequence-content');
 const nodesContainer = document.getElementById('nodes-container');
 const edgesSvg = document.getElementById('edges-svg');
-const btnConnect = document.getElementById('btn-connect');
-const btnCombine = document.getElementById('btn-combine');
 const btnDelete = document.getElementById('btn-delete');
 const activationPanel = document.getElementById('activation-panel');
 const panelTitle = document.getElementById('panel-title');
@@ -1380,79 +1594,6 @@ function endDrag() {
     document.removeEventListener('mouseup', endDrag);
 }
 
-// Connect selected nodes
-function connectNodes() {
-    const selected = Array.from(selectedNodes);
-    if (selected.length < 2) {
-        alert('Select at least 2 nodes to connect');
-        return;
-    }
-
-    // Connect each pair
-    for (let i = 0; i < selected.length - 1; i++) {
-        const fromId = selected[i];
-        const toId = selected[i + 1];
-
-        // Check if edge already exists
-        const exists = edges.some(e =>
-            (e.from === fromId && e.to === toId) ||
-            (e.from === toId && e.to === fromId)
-        );
-
-        if (!exists) {
-            const edge = { id: edgeIdCounter++, from: fromId, to: toId };
-            edges.push(edge);
-        }
-    }
-
-    updateEdges();
-}
-
-// Combine selected nodes into super node
-function combineNodes() {
-    const selected = Array.from(selectedNodes);
-    if (selected.length < 2) {
-        alert('Select at least 2 nodes to combine');
-        return;
-    }
-
-    // Gather all children
-    const children = [];
-    for (const id of selected) {
-        const node = canvasNodes.find(n => n.id === id);
-        if (node.isSuper) {
-            children.push(...node.children);
-        } else {
-            children.push({ latentIdx: node.latentIdx, layer: node.layer, pos: node.pos, aa: node.aa });
-        }
-    }
-
-    // Calculate center position
-    let sumX = 0, sumY = 0;
-    for (const id of selected) {
-        const node = canvasNodes.find(n => n.id === id);
-        sumX += node.x;
-        sumY += node.y;
-    }
-    const centerX = sumX / selected.length;
-    const centerY = sumY / selected.length;
-
-    // Remove old nodes and their edges
-    deleteSelectedInternal(selected);
-
-    // Create super node
-    const superNode = addNodeToCanvas(null, null, null, null, null, true, children);
-    superNode.x = centerX;
-    superNode.y = centerY;
-
-    const nodeEl = nodesContainer.querySelector(`[data-id="${superNode.id}"]`);
-    nodeEl.style.left = superNode.x + 'px';
-    nodeEl.style.top = superNode.y + 'px';
-
-    selectedNodes.clear();
-    updateSelectionUI();
-}
-
 // Delete selected nodes/edges
 function deleteSelected() {
     if (selectedNodes.size === 0 && selectedEdges.size === 0) {
@@ -1637,8 +1778,6 @@ document.getElementById('canvas-container').addEventListener('click', (e) => {
 });
 
 // Button handlers
-btnConnect.addEventListener('click', connectNodes);
-btnCombine.addEventListener('click', combineNodes);
 btnDelete.addEventListener('click', deleteSelected);
 
 // Fullscreen toggle

@@ -1,0 +1,3 @@
+id,circuit_name,path
+1, "Example Circuit 1", "examples/circuit1/"
+2, "Example Circuit 2", "examples/circuit2/"

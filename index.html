@@ -8,7 +8,7 @@
 </head>
 <body>
     <!-- File Upload Dropzone -->
-    <div id="upload-screen">
+    <div id="upload-screen" class="hidden">
         <div id="dropzone">
             <div class="dropzone-icon">📁</div>
             <h2>Drop Files Here</h2>
@@ -37,7 +37,15 @@
         </div>
     </div>
 
-    <div id="app" class="hidden">
+    <div id="app">
+        <!-- Example Selector -->
+        <div id="example-selector">
+            <select id="example-dropdown">
+                <option value="">Loading examples...</option>
+            </select>
+            <button id="btn-load-custom">Load Custom Circuit</button>
+        </div>
+
         <!-- Activation Detail Panel (hidden by default) -->
         <div id="activation-panel" class="hidden">
             <div id="activation-panel-header">
@@ -92,8 +100,6 @@
         <!-- Canvas Section -->
         <div id="canvas-section">
             <div id="canvas-toolbar">
-                <button id="btn-connect">Connect</button>
-                <button id="btn-combine">Combine</button>
                 <button id="btn-delete">Delete</button>
                 <button id="btn-save-canvas">Save</button>
                 <button id="btn-load-canvas">Load</button>
@@ -101,7 +107,7 @@
                 <button id="btn-virtual-weights" disabled>Virtual Weights</button>
                 <button id="btn-save-svg">Save Canvas as Image</button>
                 <button id="btn-fullscreen">Fullscreen</button>
-            </div>
+            </div1>
             <div id="canvas-container">
                 <svg id="edges-svg"></svg>
                 <div id="nodes-container"></div>
