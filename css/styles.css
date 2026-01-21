@@ -309,12 +309,12 @@ body {
 }
 
 .grid-cell {
-    padding: 4px 6px;
+    padding: 6px 10px;
     border-right: 1px solid #222;
     display: inline-flex;
     flex-direction: row;
     flex-wrap: nowrap;
-    gap: 4px;
+    gap: 6px;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
@@ -326,8 +326,8 @@ body {
 }
 
 .latent-box {
-    padding: 2px 4px;
-    font-size: 10px;
+    padding: 4px 8px;
+    font-size: 12px;
     border-radius: 3px;
     cursor: pointer;
     transition: transform 0.1s, box-shadow 0.1s;
@@ -359,7 +359,7 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 4px 6px;
+    padding: 6px 10px;
     font-size: 14px;
     cursor: pointer;
     border-right: 1px solid #333;
@@ -475,46 +475,7 @@ body {
     flex: 1;
     position: relative;
     overflow: hidden;
-}
-
-/* Canvas Resize Handle */
-#canvas-resize-handle {
-    height: 8px;
-    background: #16213e;
-    border-top: 1px solid #333;
-    cursor: ns-resize;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-#canvas-resize-handle::before {
-    content: '';
-    width: 40px;
-    height: 4px;
-    background: #444;
-    border-radius: 2px;
-    transition: background 0.2s;
-}
-
-#canvas-resize-handle:hover,
-#canvas-resize-handle.dragging {
-    background: #1a2a4e;
-}
-
-#canvas-resize-handle:hover::before,
-#canvas-resize-handle.dragging::before {
-    background: #00d9ff;
-}
-
-body.resizing-canvas {
-    user-select: none;
-    cursor: ns-resize !important;
-}
-
-#canvas-section.fullscreen #canvas-resize-handle {
-    display: none;
+    min-height: 0;
 }
 
 #edges-svg {

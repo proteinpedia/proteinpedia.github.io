@@ -468,10 +468,10 @@ function renderGrid() {
     const numPositions = sequence.length;
     const maxLatentsPerPos = computeColumnWidths();
 
-    // Base width per latent box (approx 28px per box + 4px gap)
-    const boxWidth = 32;
-    const minCellWidth = 42;
-    const cellPaddingAndBorder = 13; // 12px padding (6px each side) + 1px border
+    // Base width per latent box (larger boxes with 8px horizontal padding + 12px font)
+    const boxWidth = 50;
+    const minCellWidth = 55;
+    const cellPaddingAndBorder = 21; // 20px padding (10px each side) + 1px border
 
     let html = '';
     // Each row is a layer (reversed: 5 to 0)
@@ -2007,57 +2007,6 @@ canvasFileInput.addEventListener('change', async (e) => {
         canvasFileInput.value = '';
     }
 });
-
-// Canvas Section Resize
-const canvasResizeHandle = document.getElementById('canvas-resize-handle');
-let canvasResizeState = null;
-
-function startCanvasResize(e) {
-    if (e.button !== 0) return;
-
-    e.preventDefault();
-
-    const canvasSectionRect = canvasSection.getBoundingClientRect();
-
-    canvasResizeState = {
-        startY: e.clientY,
-        startHeight: canvasSectionRect.height
-    };
-
-    canvasResizeHandle.classList.add('dragging');
-    document.body.classList.add('resizing-canvas');
-
-    document.addEventListener('mousemove', onCanvasResize);
-    document.addEventListener('mouseup', endCanvasResize);
-}
-
-function onCanvasResize(e) {
-    if (!canvasResizeState) return;
-
-    const deltaY = e.clientY - canvasResizeState.startY;
-    let newHeight = canvasResizeState.startHeight + deltaY;
-
-    const minHeight = 150;
-    const maxHeight = window.innerHeight * 0.8;
-    newHeight = Math.max(minHeight, Math.min(maxHeight, newHeight));
-
-    canvasSection.style.height = newHeight + 'px';
-
-    updateEdges();
-}
-
-function endCanvasResize() {
-    canvasResizeState = null;
-    canvasResizeHandle.classList.remove('dragging');
-    document.body.classList.remove('resizing-canvas');
-
-    document.removeEventListener('mousemove', onCanvasResize);
-    document.removeEventListener('mouseup', endCanvasResize);
-
-    updateEdges();
-}
-
-canvasResizeHandle.addEventListener('mousedown', startCanvasResize);
 
 // Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
