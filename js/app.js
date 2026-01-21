@@ -1680,6 +1680,131 @@ function saveCanvasState() {
     URL.revokeObjectURL(url);
 }
 
+function saveCanvasAsSVG() {
+    if (canvasNodes.length === 0) {
+        alert('No nodes to export');
+        return;
+    }
+
+    // 1. Calculate bounds from all nodes
+    const padding = 40;
+    const nodeWidth = 100;
+    const nodeHeight = 50;
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const node of canvasNodes) {
+        minX = Math.min(minX, node.x);
+        minY = Math.min(minY, node.y);
+        maxX = Math.max(maxX, node.x + nodeWidth);
+        maxY = Math.max(maxY, node.y + nodeHeight);
+    }
+
+    const width = maxX - minX + padding * 2;
+    const height = maxY - minY + padding * 2;
+    const offsetX = -minX + padding;
+    const offsetY = -minY + padding;
+
+    // 2. Find weight range for edge styling
+    let minWeight = Infinity, maxWeight = -Infinity;
+    for (const edge of edges) {
+        if (edge.weight !== undefined) {
+            minWeight = Math.min(minWeight, edge.weight);
+            maxWeight = Math.max(maxWeight, edge.weight);
+        }
+    }
+    if (!isFinite(minWeight)) minWeight = 0;
+    if (!isFinite(maxWeight)) maxWeight = 0;
+    const maxAbsWeight = Math.max(Math.abs(minWeight), Math.abs(maxWeight));
+
+    // 3. Create SVG
+    let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">`;
+    svg += `<rect width="100%" height="100%" fill="#ffffff"/>`;
+
+    // 4. Draw edges
+    svg += '<g id="edges">';
+    for (const edge of edges) {
+        const fromNode = canvasNodes.find(n => n.id === edge.from);
+        const toNode = canvasNodes.find(n => n.id === edge.to);
+        if (!fromNode || !toNode) continue;
+
+        const x1 = fromNode.x + offsetX + nodeWidth / 2;
+        const y1 = fromNode.y + offsetY + nodeHeight / 2;
+        const x2 = toNode.x + offsetX + nodeWidth / 2;
+        const y2 = toNode.y + offsetY + nodeHeight / 2;
+
+        let strokeWidth = 2;
+        let strokeColor = '#666666';
+
+        if (edge.weight !== undefined && maxAbsWeight > 0) {
+            const normalizedMagnitude = Math.abs(edge.weight) / maxAbsWeight;
+            strokeWidth = 2 + normalizedMagnitude * 6;
+            strokeColor = getEdgeColor(edge.weight, minWeight, maxWeight);
+        }
+
+        svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-linecap="round"/>`;
+    }
+    svg += '</g>';
+
+    // 5. Draw edge weight labels
+    svg += '<g id="edge-labels">';
+    for (const edge of edges) {
+        if (edge.weight === undefined) continue;
+
+        const fromNode = canvasNodes.find(n => n.id === edge.from);
+        const toNode = canvasNodes.find(n => n.id === edge.to);
+        if (!fromNode || !toNode) continue;
+
+        const midX = (fromNode.x + toNode.x) / 2 + offsetX + nodeWidth / 2;
+        const midY = (fromNode.y + toNode.y) / 2 + offsetY + nodeHeight / 2;
+
+        svg += `<text x="${midX}" y="${midY - 8}" text-anchor="middle" font-size="10" fill="#333333" font-family="Arial, sans-serif">${edge.weight.toFixed(3)}</text>`;
+    }
+    svg += '</g>';
+
+    // 6. Draw nodes (light colors)
+    svg += '<g id="nodes">';
+    for (const node of canvasNodes) {
+        const x = node.x + offsetX;
+        const y = node.y + offsetY;
+
+        const bgColor = node.isSuper ? '#f0e8f8' : '#e8e8f0';
+        const borderColor = node.isSuper ? '#7a5490' : '#3060a0';
+        const textColor = node.isSuper ? '#5a3470' : '#1a1a2e';
+
+        svg += `<rect x="${x}" y="${y}" width="${nodeWidth}" height="${nodeHeight}" rx="6" fill="${bgColor}" stroke="${borderColor}" stroke-width="2"/>`;
+
+        let label;
+        if (node.isSuper) {
+            const latentIds = node.children.map(c => 'L' + (c.latentIdx + 1)).join(', ');
+            label = latentIds;
+        } else {
+            label = `L${node.layer + 1}/${node.latentIdx + 1}`;
+        }
+
+        svg += `<text x="${x + nodeWidth/2}" y="${y + 20}" text-anchor="middle" font-size="12" font-weight="bold" fill="${textColor}" font-family="Arial, sans-serif">${label}</text>`;
+
+        if (node.name) {
+            svg += `<text x="${x + nodeWidth/2}" y="${y + 35}" text-anchor="middle" font-size="10" fill="#666666" font-family="Arial, sans-serif">${node.name}</text>`;
+        } else if (node.isSuper) {
+            svg += `<text x="${x + nodeWidth/2}" y="${y + 35}" text-anchor="middle" font-size="10" fill="#888888" font-family="Arial, sans-serif">Super Node (${node.children.length})</text>`;
+        }
+    }
+    svg += '</g>';
+
+    svg += '</svg>';
+
+    // 7. Download
+    const blob = new Blob([svg], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `canvas-export-${Date.now()}.svg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
 function clearCanvas() {
     nodesContainer.innerHTML = '';
     canvasNodes = [];
@@ -1727,6 +1852,9 @@ function loadCanvasState(jsonText) {
 }
 
 btnSaveCanvas.addEventListener('click', saveCanvasState);
+
+const btnSaveSvg = document.getElementById('btn-save-svg');
+btnSaveSvg.addEventListener('click', saveCanvasAsSVG);
 
 btnLoadCanvas.addEventListener('click', () => {
     canvasFileInput.click();
