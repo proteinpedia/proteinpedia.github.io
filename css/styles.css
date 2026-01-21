@@ -240,12 +240,12 @@ body {
 
 /* Grid Section */
 #grid-container {
-    flex: 1;
+    height: 45vh;
     display: flex;
     flex-direction: row;
-    min-height: 0;
     border-bottom: 2px solid #333;
     position: relative;
+    overflow: hidden;
 }
 
 /* Grid edges SVG overlay - fixed over grid, updates on scroll */
@@ -389,12 +389,11 @@ body {
 
 /* Canvas Section */
 #canvas-section {
-    height: 300px;
-    min-height: 150px;
-    max-height: 80vh;
+    flex: 1;
     display: flex;
     flex-direction: column;
     background: #0f0f1a;
+    min-height: 0;
 }
 
 #canvas-toolbar {
