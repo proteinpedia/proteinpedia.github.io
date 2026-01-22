@@ -14,6 +14,7 @@ let virtualWeightsVisible = false;  // Toggle state for virtual weights
 let virtualWeightsEdges = [];       // Edges created from virtual weights
 let aggregatedVirtualWeights = new Map();  // Averaged weights by (layer, latent) pairs
 let virtualWeightsThreshold = 10;  // Show top x% of edges by absolute magnitude
+let gridEdgeTooltip = null;  // Tooltip for virtual weight edges
 
 // File upload state
 let uploadedFiles = {
@@ -165,6 +166,17 @@ async function loadExampleData(path) {
         renderSequence();
         updateLegend();
 
+        // Show virtual weights by default if data is available
+        if (virtualWeightsData) {
+            virtualWeightsVisible = true;
+            const btn = document.getElementById('btn-virtual-weights');
+            if (btn) {
+                btn.classList.add('active');
+                btn.innerHTML = '<span class="btn-icon">👁</span> Hide virtual weights';
+            }
+            renderVirtualWeightsInGrid();
+        }
+
     } catch (err) {
         console.error('Error loading example data:', err);
         alert('Error loading example. Please try another or load a custom circuit.');
@@ -199,11 +211,11 @@ function resetAppState() {
         btnVirtualWeights.classList.remove('active');
     }
 
-    // Hide edge filter control
-    const edgeFilterControl = document.getElementById('edge-filter-control');
-    if (edgeFilterControl) {
-        edgeFilterControl.classList.add('hidden');
-    }
+    // // Hide edge filter control
+    // const edgeFilterControl = document.getElementById('edge-filter-control');
+    // if (edgeFilterControl) {
+    //     edgeFilterControl.classList.add('hidden');
+    // }
 }
 
 // Handle dropdown change
@@ -371,6 +383,17 @@ btnLoad.addEventListener('click', async () => {
         renderGrid();
         renderSequence();
         updateLegend();
+
+        // Show virtual weights by default if data is available
+        if (virtualWeightsData) {
+            virtualWeightsVisible = true;
+            const btn = document.getElementById('btn-virtual-weights');
+            if (btn) {
+                btn.classList.add('active');
+                btn.innerHTML = '<span class="btn-icon">👁</span> Hide virtual weights';
+            }
+            renderVirtualWeightsInGrid();
+        }
 
     } catch (err) {
         console.error('Error loading files:', err);
@@ -2213,10 +2236,13 @@ btnVirtualWeights.addEventListener('click', () => {
     virtualWeightsVisible = !virtualWeightsVisible;
     btnVirtualWeights.classList.toggle('active', virtualWeightsVisible);
 
+    // Update button text and icon
     if (virtualWeightsVisible) {
+        btnVirtualWeights.innerHTML = '<span class="btn-icon">👁</span> Hide virtual weights';
         edgeFilterControl.classList.remove('hidden');
         renderVirtualWeightsInGrid();
     } else {
+        btnVirtualWeights.innerHTML = '<span class="btn-icon">👁</span> Show virtual weights';
         edgeFilterControl.classList.add('hidden');
         clearVirtualWeightsFromGrid();
     }
@@ -2404,8 +2430,6 @@ function updateGridEdgePositions() {
 gridBody.addEventListener('scroll', updateGridEdgePositions);
 
 // Edge tooltip for grid
-let gridEdgeTooltip = null;
-
 function createGridEdgeTooltip() {
     if (!gridEdgeTooltip) {
         gridEdgeTooltip = document.createElement('div');

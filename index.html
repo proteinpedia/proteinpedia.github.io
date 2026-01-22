@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Activation Viewer</title>
+    <title>Protein Circuit Tracing</title>
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -40,10 +40,19 @@
     <div id="app">
         <!-- Example Selector -->
         <div id="example-selector">
+            <h3>Protein Circuit Tracing</h3>
             <select id="example-dropdown">
                 <option value="">Loading examples...</option>
             </select>
             <button id="btn-load-custom">Load Custom Circuit</button>
+            <button id="btn-virtual-weights" disabled><span class="btn-icon">👁</span> Show virtual weights</button>
+
+            <div id="edge-filter-control">
+                <span class="filter-label">Filter Virtual Weights:</span>
+                <input type="range" id="edge-threshold-slider" min="0.01" max="100" step="0.01" value="10" />
+                <input type="number" id="edge-threshold-input" min="0.01" max="100" step="0.01" value="10" />
+                <span class="percent-sign">%</span>
+            </div>
         </div>
 
         <!-- Activation Detail Panel (hidden by default) -->
@@ -53,6 +62,8 @@
                 <button id="panel-close">&times;</button>
             </div>
             <div id="activation-panel-content"></div>
+
+            
         </div>
 
         <!-- Layer Panel (hidden by default) -->
@@ -65,17 +76,12 @@
         </div>
 
         <!-- Color Legend -->
-        <div id="color-legend">
+        <div id="color-legend" style="display: none;">
             <span class="legend-label">Activation:</span>
             <div class="legend-gradient"></div>
             <span class="legend-min">Low</span>
             <span class="legend-max">High</span>
-            <div id="edge-filter-control" class="hidden">
-                <span class="filter-label">Show Top:</span>
-                <input type="range" id="edge-threshold-slider" min="0.01" max="100" step="0.01" value="10" />
-                <input type="number" id="edge-threshold-input" min="0.01" max="100" step="0.01" value="10" />
-                <span class="percent-sign">%</span>
-            </div>
+            
         </div>
 
         <!-- Grid Section -->
@@ -104,7 +110,6 @@
                 <button id="btn-save-canvas">Save</button>
                 <button id="btn-load-canvas">Load</button>
                 <input type="file" id="canvas-file-input" accept=".json" style="display: none;" />
-                <button id="btn-virtual-weights" disabled>Virtual Weights</button>
                 <button id="btn-save-svg">Save Canvas as Image</button>
                 <button id="btn-fullscreen">Fullscreen</button>
             </div>
