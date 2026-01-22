@@ -351,7 +351,7 @@ body {
     border-bottom: 2px solid #333;
     overflow-x: auto;
     padding: 8px 0;
-    margin-left: 82px; /* Align with grid (layer-labels width + border) */
+    margin-left: 125px; /* Align with grid (layer-labels width + border) */
 }
 
 #sequence-content {
