@@ -273,7 +273,7 @@ body {
     border-right: 2px solid #333;
     flex-shrink: 0;
     width: 125px;
-    z-index: 9999999999;
+    z-index: 99999;
 }
 
 .layer-label {
@@ -1255,6 +1255,7 @@ body {
     flex-direction: column;
     box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
     transition: transform 0.3s ease;
+    z-index: 9999999999999999;
 }
 
 #layer-panel.hidden {
