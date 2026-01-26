@@ -273,7 +273,7 @@ body {
     border-right: 2px solid #333;
     flex-shrink: 0;
     width: 125px;
-    z-index: 99999;
+    z-index: 999;
 }
 
 .layer-label {

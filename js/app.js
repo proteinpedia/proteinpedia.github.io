@@ -115,11 +115,12 @@ async function loadExampleData(path) {
         resetAppState();
 
         // Fetch all required files
-        const [activationsText, seqText, topActivationsText, virtualWeightsText] = await Promise.all([
+        const [activationsText, seqText, topActivationsText, virtualWeightsText, canvasStateText] = await Promise.all([
             fetch(path + 'activation_indices.json').then(r => r.text()),
             fetch(path + 'seq.txt').then(r => r.text()),
             fetch(path + 'top_activations.json').then(r => r.text()),
-            fetch(path + 'virtual_weights.json').then(r => r.ok ? r.text() : null).catch(() => null)
+            fetch(path + 'virtual_weights.json').then(r => r.ok ? r.text() : null).catch(() => null),
+            fetch(path + 'canvas-state.json').then(r => r.ok ? r.text() : null).catch(() => null)
         ]);
 
         const activations = JSON.parse(activationsText);
@@ -175,6 +176,11 @@ async function loadExampleData(path) {
                 btn.innerHTML = '<span class="btn-icon">👁</span> Hide virtual weights';
             }
             renderVirtualWeightsInGrid();
+        }
+
+        // Load canvas state if available
+        if (canvasStateText) {
+            loadCanvasState(canvasStateText);
         }
 
     } catch (err) {
