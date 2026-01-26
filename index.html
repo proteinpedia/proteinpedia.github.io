@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Protein Circuit Tracing</title>
     <link rel="stylesheet" href="css/styles.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
     <!-- File Upload Dropzone -->
@@ -33,18 +34,18 @@
                     <span class="file-name">virtual_weights.json (optional)</span>
                 </div>
             </div>
-            <button id="btn-load" disabled>Load Data</button>
+            <button id="btn-load" disabled><i data-lucide="upload"></i> Load Data</button>
         </div>
     </div>
 
     <div id="app">
         <!-- Example Selector -->
         <div id="example-selector">
-            <h3>Protein Circuit Tracing</h3>
+            <img src="img/logo.png" alt="Protein Circuit Tracing" id="site-logo">
             <select id="example-dropdown">
                 <option value="">Loading examples...</option>
             </select>
-            <button id="btn-load-custom">Load Custom Circuit</button>
+            <button id="btn-load-custom"><i data-lucide="folder-open"></i> Load Custom Circuit</button>
             <button id="btn-virtual-weights" disabled><span class="btn-icon">👁</span> Show virtual weights</button>
 
             <div id="edge-filter-control">
@@ -59,7 +60,7 @@
         <div id="activation-panel" class="hidden">
             <div id="activation-panel-header">
                 <h2 id="panel-title">Latent Activations</h2>
-                <button id="panel-close">&times;</button>
+                <button id="panel-close" aria-label="Close panel"><i data-lucide="x"></i></button>
             </div>
             <div id="activation-panel-content"></div>
 
@@ -70,7 +71,7 @@
         <div id="layer-panel" class="hidden">
             <div id="layer-panel-header">
                 <h2 id="layer-panel-title">Layer Latent Rankings</h2>
-                <button id="layer-panel-close">&times;</button>
+                <button id="layer-panel-close" aria-label="Close panel"><i data-lucide="x"></i></button>
             </div>
             <div id="layer-panel-content"></div>
         </div>
@@ -106,12 +107,12 @@
         <!-- Canvas Section -->
         <div id="canvas-section">
             <div id="canvas-toolbar">
-                <button id="btn-delete">Delete</button>
-                <button id="btn-save-canvas">Save</button>
-                <button id="btn-load-canvas">Load</button>
+                <button id="btn-delete"><i data-lucide="trash-2"></i> Delete</button>
+                <button id="btn-save-canvas"><i data-lucide="save"></i> Save</button>
+                <button id="btn-load-canvas"><i data-lucide="folder-open"></i> Load</button>
                 <input type="file" id="canvas-file-input" accept=".json" style="display: none;" />
-                <button id="btn-save-svg">Save Canvas as Image</button>
-                <button id="btn-fullscreen">Fullscreen</button>
+                <button id="btn-save-svg"><i data-lucide="image-down"></i> Save Canvas as Image</button>
+                <button id="btn-fullscreen"><i data-lucide="maximize"></i> Fullscreen</button>
             </div>
 
             <div id="canvas-container">
@@ -137,12 +138,13 @@
             <h3>Add Node Name</h3>
             <input type="text" id="node-name-input" placeholder="Enter name...">
             <div class="name-popup-buttons">
-                <button id="name-popup-cancel">Cancel</button>
-                <button id="name-popup-save">Save</button>
+                <button id="name-popup-cancel"><i data-lucide="x"></i> Cancel</button>
+                <button id="name-popup-save"><i data-lucide="check"></i> Save</button>
             </div>
         </div>
     </div>
 
     <script src="js/app.js"></script>
+    <script>lucide.createIcons();</script>
 </body>
 </html>
