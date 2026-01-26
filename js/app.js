@@ -1298,12 +1298,12 @@ function getActivationColorForPanel(value, minVal, maxVal) {
 // Color scale for edge weights (blue for negative, red for positive)
 function getEdgeColor(weight, minWeight, maxWeight) {
     // Color definitions
-    // Negative: #82ccdd (light blue) -> #3c6382 (dark blue)
-    const negLow = { r: 130, g: 204, b: 221 };  // #82ccdd
-    const negHigh = { r: 60, g: 99, b: 130 };   // #3c6382
-    // Positive: #f8c291 (light orange) -> #eb2f06 (red)
-    const posLow = { r: 248, g: 194, b: 145 };  // #f8c291
-    const posHigh = { r: 235, g: 47, b: 6 };    // #eb2f06
+    // Negative: #82ccdd (light blue) -> #eb2f06 (red)
+    const negLow = { r: 248, g: 194, b: 145 };  // #f8c291
+    const negHigh = { r: 235, g: 47, b: 6 };   // #eb2f06
+    // Positive: #f8c291 (light orange) -> #3c6382 (dark blue)
+    const posLow = { r: 130, g: 204, b: 221 };  //  #82ccdd
+    const posHigh = { r: 60, g: 99, b: 130 };    //  #3c6382
 
     // Handle edge case where all weights are the same
     if (maxWeight === minWeight) {
